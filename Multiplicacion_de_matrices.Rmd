@@ -1,0 +1,67 @@
+---
+title: "Multiplicación de matrices con apply"
+author: "Jorge Emilio Zapata Godoy"
+date: "05/02/2020"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+## R MARKDOWN
+### Declaracion de las matrices a multiplicar
+
+```{r Declaracion de las matrices a multiplicar}
+
+data1 <- c(55,46,34,22,1,9,43,99,34,56,13,34,55,66,22,32,90,156,145,40) #20 elementos
+data2 <- c(56,78,34,21,900,54,3,13,34,11,45,2,1,10,34,15,17,49,45,32) #20 elementos
+A <- matrix(data = data1, ncol = 4)
+B <- matrix(data = data2, ncol = 4)
+
+print(A)
+print(B)
+```
+
+### Algoritmo de multiplicacion de matrices con "for" en una función
+
+```{r Algoritmo de multiplicacion de matrices en una función}
+multiplyMatrix <- function(A, B){
+  result_matrix <- matrix(data = NA, nrow = dim(A)[1], ncol = dim(B)[2])
+  
+  if (nrow(A) == ncol(B)){
+    for (i in seq_along(A[1, ])) {
+      for (j in seq_along(B[ ,1])) {
+        result_matrix[j, i] <- sum(A[j, ] * B[, i])
+      }
+    }
+  } else {
+    print("Not posible to multiply, please verify the length of matrix")
+  }
+  return(result_matrix)
+}
+```
+
+### Llamando la funcion de multiplicacion de matrices con fors
+
+``` {r Funcion de multiplicar matrices en R}
+matrixResult <- multiplyMatrix(A, B)
+print(matrixResult)
+```
+
+### Funcion para multiplicar matrices con apply
+
+``` {r  Funcion para multiplicar matrices con programacion vectorial}
+X <- matrix(data = 1:100, nrow = 4, ncol = 5)
+Y <- matrix(data= 1:100, nrow = 5, ncol = 4)
+
+multiplyMatrixApply <- function(x){
+  apply(X = Y, MARGIN = 2, FUN = function(y) sum(x*y))
+}
+
+matrixResultApply <- t(apply(X = X, MARGIN = 1, FUN = function(x) multiplyMatrixApply(x)))
+print(matrixResultApply)
+```
+
+
+``` {r comprobacion}
+X%*%Y
+```
