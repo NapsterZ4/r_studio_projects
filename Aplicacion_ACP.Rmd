@@ -1,0 +1,108 @@
+---
+title: "Analisis de mtcars dataset - ACP"
+author: "Jorge Zapata"
+date: "2/8/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Aplicacion de ACP para el conjunto de datos mtcars
+A continuacion insertamos las librerias necesarias
+
+``` {r libraries}
+library(FactoMineR)
+library(factoextra)
+library(DT)
+library(corrplot)
+library(ggplot2)
+library(pastecs) #Libreria para analisis estadistico
+```
+
+Insertamos el conjunto de datos desde nuestro escritorio
+``` {r Insertamos conjunto de datos}
+data <- read.csv("/mnt/napster_disk/LEAD University/IQ - 2020/Minería de Datos Avanzada/mtcars.csv", header = TRUE, sep = ",")
+```
+
+Realizamos un analisis exploratorio inicial con la libreria de pastecs para revisar desviaciones y varianza en los datos
+``` {r Analisis exploratorio inicial}
+DT::datatable(data)
+stat.desc(data)
+```
+
+# Seleccionando la cantidad de variables y aplicando PCA
+A continuacion, aplicamos de forma sencilla un PCA que nos ayude a realizar una seleccion de variables indicandole que elimine la variable no cuantitativa "X" que formaba parte del conjunto de datos, el cual no es aplicable un PCA porque es cualitativo.
+``` {r Seleccion de variables}
+pca.data <- PCA(data[,2:12], ncp = 5, graph = FALSE)
+pca.data$call
+```
+
+## Calidad de los componentes
+La calidad de cada individuo podemos encontrarla a partir de los eigenvalores del analisis de componentes, la salida del PCA en la libreria de uso actual es una lista con los valores, ademas de una serie de caracteristicas que tenemos disponibles para analizar.
+``` {r Calidad de cada componente}
+eigenvalues <- pca.data$eig
+barplot(eigenvalues[,2],
+        main = "Varianza de cada componente",
+        xlab = "Componentes principales",
+        ylab = "Porcentaje de varianza",
+        col = "steelblue")
+DT::datatable(eigenvalues)%>%formatStyle(columns = eigenvalues, color = 'black')
+```
+
+## Calidad particular
+En el grafico anterior logramos observar que los componentes 1 y 2 mantienen la mayor cantidad de informacion en la reduccion de las dimensionalidades de los datos. A continuacion evaluaremos la calidad individual de cada variable utilizando el metodo de cosenos cuadrados y a traves de la libreria "DT" establecer los valores en formato de porcentaje.
+
+``` {r Calidad particular}
+DT::datatable(pca.data$ind$cos2)%>%formatPercentage(colnames(pca.data$ind$cos2), 4)
+```
+
+## Contribucion
+La contribucion de cada individuo o dimension al componente principal se refiere a que tan bien proyectado o representado (que tan cerca se encuentra del plano R^n del componente) se encuentra con el plano de la componente. A continuacion establecemos una tabla para visualizar los indviduos que mejor representados estan.
+
+``` {r Contribucion}
+DT::datatable(pca.data$ind$contrib)%>%formatRound(colnames(pca.data$ind$contrib), 4)
+
+barplot(pca.data$ind$contrib,
+        main = "Contribucion de individuos",
+        xlab = "Individuos",
+        ylab = "Contribucion",
+        col = "steelblue")
+```
+
+## Representaciones graficas de individuos
+La siguiente representacion grafica demuestra la representacion en el grafico de informacion de cada individuo con coseno cuadrado, en los cuales entre mas se acerquen a 0, es mucho mejor su proyeccion.
+
+``` {r Representacion grafica de individuos usando cosenos cuadrados}
+fviz_pca_ind(pca.data, col.ind = "cos2", geom = "text", 
+             gradient.cols = c("black", "purple", "orange" ), title  = "Representacion grafica de individuos con cosenos cuadrados")
+```
+
+## Calidad de las variables
+La calidad de las variables que queremos analizar en el dataset "mtcars", esta se mide con la contribucion de la variable en cada componente por medio de cosenos cuadrados.
+
+``` {r Calidad de variables}
+DT::datatable(pca.data$var$cos2)%>%formatPercentage(colnames(pca.data$var$cos2), 4)
+DT::datatable(pca.data$var$contrib)%>%formatRound(colnames(pca.data$var$contrib), 4)
+```
+
+El las tablas anteriores observamos que la variable "mpg", mantiene un 86.8531% de informacion en el componente #1.
+
+## Correlacion de variables con cada componente
+Evaluaremos la correlacion existente entre cada componente incluyendo la diferencia entre la contribucion y evaluandola con cosenos cuadrados.
+
+```{r Correlacion de variables con cada componente}
+corrplot(pca.data$var$cor, method = 'pie')
+```
+En el grafico anterior observamos que las variables "cyl", "disp", "hp" y "wt" mantienen alta correlacion con el componente #1, esto significa que encontramos buena informacion representada en la componente 1 y 2.
+
+```{r Correlacion con contribucion}
+fviz_pca_var(pca.data, col.var = "contrib", gradient.cols = c("black", "purple", "orange"), ggtheme = theme_minimal())
+```
+
+```{r Correlacion con cosenos cuadrados}
+fviz_pca_var(pca.data, col.var = "cos2", gradient.cols = c("black", "purple", "orange"), ggtheme = theme_minimal())
+```
+
+No se encuentran cambios significativos en las correlaciones y resultados utilizando la contribucion de las variables y cosenos cuadrados.
