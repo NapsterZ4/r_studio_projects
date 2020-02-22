@@ -1,0 +1,152 @@
+---
+title: "Benchmark de Componentes Principales y Análisis de Correspondencias"
+date: "`r Sys.Date()`"
+author: "Jorge Emilio Zapata Godoy"
+output:
+  rmdformats::readthedown:
+    highlight: kate
+---
+
+```{r setup, echo=FALSE, cache=FALSE}
+library(knitr)
+library(rmdformats)
+
+## Global options
+options(max.print="75")
+opts_chunk$set(echo=FALSE,
+	             cache=TRUE,
+               prompt=FALSE,
+               tidy=TRUE,
+               comment=NA,
+               message=FALSE,
+               warning=FALSE)
+opts_knit$set(width=75)
+```
+
+# Analisis inicial
+## Librerías
+En primera instancia cargamos todas las librerias necesarias para generar el análisis
+```{r Librerias}
+library(FactoMineR)
+library(factoextra)
+library(DT)
+library(corrplot)
+library(ggplot2)
+library(pastecs) #Libreria para analisis estadistico
+library(tidyverse)
+```
+
+## Inicializando los datos
+Inicializamos los datos en la variable *data* desde nuestro directorio donde esta almacenado en formato .csv
+```{r Cargando datos}
+setwd(dir = "/mnt/napster_disk/LEAD University/IQ - 2020/Minería de Datos Avanzada/")
+
+data = read.csv("DatosElecciones.csv", sep = ";", header = TRUE)
+attach(data)
+```
+
+## Analisis estadistico inicial
+Realizamos un análisis exploratorio inicial en el cual vemos variables categóricas y variables numéricas. Observamos que no se ncuentran valores nulos en las variables y una desviación estándar mas alta en la ciudad de San José con 7.0996 y una media de 5.8124, esto significa que la mayoría de votos e influencia proviene de esta región.
+```{r Analisis inicial}
+DT::datatable(data)
+stat.desc(data)
+```
+
+# Selección de variables
+## Aplicando comparación de ACP y AC
+En los resultados de la aplicación del análisis de componentes principales y análisis de correspondencias, observamos que el PCA tiene su mayor porcentaje de representación en el primer componente con 90.4650 y el AC en su primer componente tiene un 73.3539 pero distribuye el resto en el segundo componente  con 19.3452 10 veces mas de la representación del segundo componente en el PCA.
+```{r Aplicando ACP}
+acp.data <- PCA(data[,2:8], graph = FALSE)
+ac.data <- CA(data[,2:8], graph = FALSE)
+
+N1 <- dim(acp.data$eig)
+N2 <- dim(ac.data$eig)
+
+N.min <- min(N1[1], N2[1])
+index <- 1:N.min #Indice para evaluar el minimo y concatenar con el cbind
+
+DT::datatable(cbind(acp.data$eig[index,], ac.data$eig[index,]))
+```
+
+## Insertando etiquetas para comparar
+Insertamos las etiquetas que necesitaremos en las tablas para diferenciar cual es PCA y CA
+```{r Etiquetas}
+#Eigenvalores
+colnames(acp.data$eig) <- paste0("PCA: ", colnames(acp.data$eig)) #Concatena a los headers el identificador de cada columna
+colnames(ac.data$eig) <- paste0("AC: ", colnames(ac.data$eig))
+
+#Calidad particular de individuos
+colnames(acp.data$ind$cos2) <- paste0("PCA: ", colnames(acp.data$ind$cos2))
+colnames(ac.data$row$cos2) <- paste0("CA: ", colnames(ac.data$row$cos2)) 
+```
+
+## Seleccionando el numero de variables en ACP y CA
+En el gráfico observamos en la línea azul y puntos azules la representación del ACP y el AC en color rojo. Observamos que el primer componente en ACP mantiene mayor representación junto con el segundo, pero para el AC el primero, segundo y tercer componente mantienen y se distribuyen las representaciones, como conclusión podemos elejir los tres primeros componentes.
+```{r Selección del número de variables ACP y CA}
+p1 <- data.frame(proc_var_acum_acp = acp.data$eig[,3],
+                 pc_acp = 1:dim(acp.data$eig)[1])
+
+p2 <- data.frame(proc_var_acum_ac = ac.data$eig[,3],
+                 pc_ac = 1:dim(ac.data$eig)[1])
+
+plot1 <- ggplot() + geom_point(data = p1, aes(x = pc_acp, y = proc_var_acum_acp, colour = "blue")) + 
+                    geom_point(data = p2, aes(x = pc_ac, y = proc_var_acum_ac, colour = "red")) +
+                    geom_line(data = p1, aes(x = pc_acp, y = proc_var_acum_acp, colour = "blue")) +
+                    geom_line(data = p2, aes(x = pc_ac, y = proc_var_acum_ac, colour = "red")) +
+                    labs(x = "Componente principal", y = "Prop. varianza explicada acumulada", title = "Comparación de ACP con AC") +
+                    theme(legend.position = c(0.95, 0.5),
+                          legend.justification = c("right", "top")) +
+                    scale_color_manual(name = "Legend", label = c("ACP", "AC"), values = c("blue", "red"))
+    
+plot1
+```
+
+# Comparación de calidad de individuos
+## Calidad global
+La calidad global de cada variable en los componentes la podemos observar en formato de porcentaje para hacer la comparación de ambos métodos que de forma implicita se evaluó en el apartado anterior.
+```{r Calidad global ACP y AC}
+calidad_global_acp <- acp.data$eig
+calidad_global_ac <- ac.data$eig
+
+#Obtenemos porcentajes
+calidad_global_acp[,2:3] <- calidad_global_acp[,2:3]/100
+calidad_global_ac[,2:3] <- calidad_global_ac[,2:3]/100
+
+DT::datatable(cbind(calidad_global_acp[index,], calidad_global_ac[index,]))%>%formatRound(c('PCA: eigenvalue', 'AC: eigenvalue'), 2)%>%
+  formatPercentage(c('PCA: percentage of variance', 'PCA: cumulative percentage of variance', 'AC: percentage of variance', 'AC: cumulative percentage of variance'), 2)
+```
+
+## Calidad Particular
+La calidad particular de cada categoría en los componentes la observamos en los planos representados entre el punto original y la distancia al punto proyectado del plano del componente. En este caso la realizaremos a través de cosenos cuadrados.
+
+```{r Calidad particular}
+#Tablas
+calidad_particular_general <- cbind(acp.data$ind$cos2[index,], ac.data$row$cos2[index,])
+DT::datatable(calidad_particular_general)%>%formatPercentage(colnames(calidad_particular_general), 2)
+
+#Graficos 
+fviz_ca_row(ac.data, col.row = "cos2", gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"), repel = TRUE, geom = "text")
+fviz_pca_ind(acp.data, col.ind = "cos2", gradient.cols = c("#FFFFFF", "#2E9FDF", "#FC4E07" ), repel = TRUE, geom = "text")
+
+#Histogramas
+#ggplot() + geom_histogram() 
+
+ggplot(rbind(acp.data$ind$cos2[index,])) + geom_histogram()
+
+```
+
+```{r prueba}
+etapa1 <- data.frame(AverageTemperature = rnorm(100000, 16.9, 2))
+etapa2 <- data.frame(AverageTemperature = rnorm(100000, 17.4, 2))
+
+#Now, combine your two dataframes into one.  First make a new column in each.
+etapa1$e <- 'etapa1'
+etapa2$e <- 'etapa2'
+
+# combine the two data frames etapa1 and etapa2
+combo <- rbind(etapa1, etapa2)
+
+ggplot(combo, aes(AverageTemperature, fill = e)) + geom_histogram()
+
+combo
+```
