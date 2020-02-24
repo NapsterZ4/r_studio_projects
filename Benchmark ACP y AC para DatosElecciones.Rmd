@@ -1,9 +1,14 @@
 ---
-title: "Benchmark de Componentes Principales y Análisis de Correspondencias"
+title: "Benchmark de Componentes Principales y Análisis de Correspondencias DatosElecciones.csv"
 date: "`r Sys.Date()`"
 author: "Jorge Emilio Zapata Godoy"
 output:
   rmdformats::readthedown:
+    self_contained: true
+    thumbnails: true
+    lightbox: true
+    gallery: false
+    use_bookdown: true
     highlight: kate
 ---
 
@@ -45,7 +50,7 @@ data = read.csv("DatosElecciones.csv", sep = ";", header = TRUE)
 attach(data)
 ```
 
-## Analisis estadistico inicial
+## Análisis Estadístico Inicial
 Realizamos un análisis exploratorio inicial en el cual vemos variables categóricas y variables numéricas. Observamos que no se ncuentran valores nulos en las variables y una desviación estándar mas alta en la ciudad de San José con 7.0996 y una media de 5.8124, esto significa que la mayoría de votos e influencia proviene de esta región.
 ```{r Analisis inicial}
 DT::datatable(data)
@@ -77,7 +82,19 @@ colnames(ac.data$eig) <- paste0("AC: ", colnames(ac.data$eig))
 
 #Calidad particular de individuos
 colnames(acp.data$ind$cos2) <- paste0("PCA: ", colnames(acp.data$ind$cos2))
-colnames(ac.data$row$cos2) <- paste0("CA: ", colnames(ac.data$row$cos2)) 
+colnames(ac.data$row$cos2) <- paste0("CA: ", colnames(ac.data$row$cos2))
+
+#Contribucion de individuos
+colnames(acp.data$ind$contrib) <- paste0("PCA: ", colnames(acp.data$ind$contrib))
+colnames(ac.data$row$contrib) <- paste0("AC: ", colnames(ac.data$row$contrib))
+
+#Calidad particular de variables
+colnames(acp.data$var$cos2) <- paste0("PCA: ", colnames(acp.data$var$cos2))
+colnames(ac.data$col$cos2) <- paste0("AC: ", colnames(ac.data$col$cos2))
+
+#Contribucion de variables
+colnames(acp.data$var$contrib) <- paste0("PCA: ", colnames(acp.data$var$contrib))
+colnames(ac.data$col$contrib) <- paste0("AC: ", colnames(ac.data$col$contrib))
 ```
 
 ## Seleccionando el numero de variables en ACP y CA
@@ -101,6 +118,13 @@ plot1 <- ggplot() + geom_point(data = p1, aes(x = pc_acp, y = proc_var_acum_acp,
 plot1
 ```
 
+## Histogramas de valores propios
+En los histogramas logramos observar que para el análisis de componentes principales la primera dimensión (componente), mantiene la cantidad de representación, en cambio como observamos en el gráfico anterior para el análisis de correspondencias mantiene su representación distribuída en cada dimensión o componente hasta el tercero.
+```{r Hitogramas de valores propios}
+fviz_eig(acp.data, linecolor="red", barcolor = "darkblue", barfill = "purple", title = "Histogram PCA")
+fviz_eig(ac.data, linecolor="red", barcolor = "darkblue", barfill = "purple", title = "Histogram AC")
+```
+
 # Comparación de calidad de individuos
 ## Calidad global
 La calidad global de cada variable en los componentes la podemos observar en formato de porcentaje para hacer la comparación de ambos métodos que de forma implicita se evaluó en el apartado anterior.
@@ -118,35 +142,50 @@ DT::datatable(cbind(calidad_global_acp[index,], calidad_global_ac[index,]))%>%fo
 
 ## Calidad Particular
 La calidad particular de cada categoría en los componentes la observamos en los planos representados entre el punto original y la distancia al punto proyectado del plano del componente. En este caso la realizaremos a través de cosenos cuadrados.
-
+En el ACP, observamos que su representación en su primer componente es del 90.5% y en el segundo del 8.4% y tiene por cosenos cuadrados un pequeño cluster entre los grupos del 3 - 10 en el primer componente y tener buena representación en el coseno cuadrado. En cambio para el AC, muestra los puntos muy dispersos, entre ellos un dato alejado del resto (número 3).
 ```{r Calidad particular}
 #Tablas
 calidad_particular_general <- cbind(acp.data$ind$cos2[index,], ac.data$row$cos2[index,])
 DT::datatable(calidad_particular_general)%>%formatPercentage(colnames(calidad_particular_general), 2)
 
 #Graficos 
-fviz_ca_row(ac.data, col.row = "cos2", gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"), repel = TRUE, geom = "text")
-fviz_pca_ind(acp.data, col.ind = "cos2", gradient.cols = c("#FFFFFF", "#2E9FDF", "#FC4E07" ), repel = TRUE, geom = "text")
-
-#Histogramas
-#ggplot() + geom_histogram() 
-
-ggplot(rbind(acp.data$ind$cos2[index,])) + geom_histogram()
-
+fviz_pca_ind(acp.data, col.ind = "cos2", gradient.cols = c("blue", "orange", "red"), repel = TRUE, geom = "text")
+fviz_ca_row(ac.data, col.row = "cos2", gradient.cols = c("blue", "orange", "red"), repel = TRUE, geom = "text")
 ```
 
-```{r prueba}
-etapa1 <- data.frame(AverageTemperature = rnorm(100000, 16.9, 2))
-etapa2 <- data.frame(AverageTemperature = rnorm(100000, 17.4, 2))
+## Contribución
+Los gráficos muestran la misma posición, sin embargo, la contribución no es uniforme, de hecho el cluster entre 3 - 10 para el PCA no cuenta con una buena distribución para el primer componente, muestra algunos individuos con mejor contribución en el segundo componente. La contribución de los individuos en Análisis de correspondencias también se encuentra muy alejado de una buena contribución, excepto el elemento 2 y 12.
+```{r Contribucion de individuos}
+#Tablas
+contribucion_individuos <- cbind(acp.data$ind$contrib[index,], ac.data$row$contrib[index,])
+DT::datatable(contribucion_individuos)%>%formatPercentage(colnames(contribucion_individuos), 1)
 
-#Now, combine your two dataframes into one.  First make a new column in each.
-etapa1$e <- 'etapa1'
-etapa2$e <- 'etapa2'
+#Graficos
+fviz_pca_ind(acp.data, col.ind = "contrib", gradient.cols = c("blue", "orange", "red"), repel = TRUE, geom = "text")
+fviz_ca_row(ac.data, col.row = "contrib", gradient.cols = c("blue", "orange", "red"), repel = TRUE, geom = "text")
+```
 
-# combine the two data frames etapa1 and etapa2
-combo <- rbind(etapa1, etapa2)
+# Comparación de calidad de variables
+## Cosenos cuadrados
+Para los cosenos cuadrados, evaluaremos la representación en cada componente por parte de las variables. El círculo de correlaciones para el ACP se encuentra en conjunto, gradualmente representado con cosenos cuadrados en el primer componente, excepto la variable *Guanacaste*. Para el CA, tenemos una excelente representación de la variable *Cartago* y *Guanacaste* sucede igual que el ACP. En la tabla observamos que el primer componente mantiene la mayor representación en casi todas las variables con un 99.48$ en *Alajuela*. Para el CA, el 95.84% de información se encuentra en el primero componente para *Puntarenas*.
+```{r Cosenos cuadrados de variables}
+#Tablas
+cosenos_cuadrados_variables <- cbind(acp.data$var$cos2[index,], ac.data$col$cos2[index,])
+DT::datatable(cosenos_cuadrados_variables)%>%formatPercentage(colnames(cosenos_cuadrados_variables), 2)
 
-ggplot(combo, aes(AverageTemperature, fill = e)) + geom_histogram()
+#Graficos
+fviz_pca_var(acp.data, col.var = "cos2", gradient.cols = c("yellow", "blue", "red"), ggtheme = theme_gray())
+fviz_ca_col(ac.data, col.col = "cos2", gradient.cols = c("yellow", "blue", "red"), ggtheme = theme_gray())
+```
 
-combo
+## Contribución de variables
+En la contribución de las variables no se encuentra diferencia significativa, sin embargo en la representación para el análisis de correspondencias, encontramos que *Alajuela* y *Guanacaste* mantienen una baja contribución.
+```{r Contribución de variables}
+#Tablas
+contribucion_variables <- cbind(acp.data$var$contrib[index,], ac.data$col$contrib[index,])
+DT::datatable(contribucion_variables)%>%formatPercentage(colnames(contribucion_variables), 2)
+
+#Graficos
+fviz_pca_var(acp.data, col.var = "contrib", gradient.cols = c("yellow", "blue", "red"), ggtheme = theme_gray())
+fviz_ca_col(ac.data, col.col = "contrib", gradient.cols = c("yellow", "blue", "red"), ggtheme = theme_gray())
 ```
