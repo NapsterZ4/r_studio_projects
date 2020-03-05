@@ -1,0 +1,120 @@
+---
+title: ""
+date: "`r Sys.Date()`"
+output:
+  rmdformats::readthedown:
+    highlight: kate
+---
+
+```{r setup, echo=FALSE, cache=FALSE}
+library(knitr)
+library(rmdformats)
+
+## Global options
+options(max.print="75")
+opts_chunk$set(echo=TRUE,
+	             cache=TRUE,
+               prompt=FALSE,
+               tidy=TRUE,
+               comment=NA,
+               message=FALSE,
+               warning=FALSE)
+opts_knit$set(width=75)
+```
+# Librerias
+Cargamos las librerias necesarias
+
+```{r Cargando las librerias}
+library(stats)
+library(ggplot2)
+```
+
+# Cargando los datos
+```{r Cargando los datos}
+data("USArrests")
+head(USArrests)
+
+#Escalar los datos
+data <- scale(na.omit(USArrests))
+```
+
+#Activando la funcion
+```{r Funcion de Kmeans}
+calcular.totwithinss <- function(n.clusters, datos, iter.max=1000, nstart=50, algorithm){
+  # Esta función aplica el algoritmo kmeans y devuelve la suma total de
+  # cuadrados internos.
+  cluster.kmeans <- kmeans(centers = n.clusters, x = datos, iter.max = iter.max,
+                           nstart = nstart, algorithm = algorithm)
+  return(cluster.kmeans$tot.withinss)
+}
+
+```
+
+#Aplicando las funciones para Hartigan-wong
+```{r Aplicando la funcion para Hartigan-wong}
+n<-15
+total.withinss.hartigan<-rep(0,n)
+indx<-1:n
+
+for(k in indx){
+  total.withinss.hartigan[k]<-calcular.totwithinss(k, data, algorithm = "Hartigan-Wong")
+}
+```
+
+#Aplicando las funciones para Lloyd
+```{r Aplicando la funcion para Lloyd}
+n<-15
+total.withinss.lloyd<-rep(0,n)
+indx<-1:n
+
+for(k in indx){
+  total.withinss.lloyd[k]<-calcular.totwithinss(k, data, algorithm = "Lloyd")
+}
+```
+
+#Aplicando las funciones para Forgy
+```{r Aplicando la funcion para Forgy}
+n<-15
+total.withinss.forgy<-rep(0,n)
+indx<-1:n
+
+for(k in indx){
+  total.withinss.forgy[k]<-calcular.totwithinss(k, data, algorithm = "Forgy")
+}
+```
+
+#Aplicando las funciones para MacQueen
+```{r Aplicando la funcion para MacQueen}
+n<-15
+total.withinss.macqueen<-rep(0,n)
+indx<-1:n
+
+for(k in indx){
+  total.withinss.macqueen[k]<-calcular.totwithinss(k, data, algorithm = "MacQueen")
+}
+```
+
+#Grafica de comparacion
+```{r Grafica de comparacion}
+kmeans.data.frame <- data.frame("hartigan" = total.withinss.hartigan,
+                                "lloyd" = total.withinss.lloyd,
+                                "forgy" = total.withinss.forgy,
+                                "macqueen" = total.withinss.macqueen)
+
+plot1 <- ggplot() + geom_point(data = kmeans.data.frame, aes(x = 1:n, y = hartigan, colour = "blue")) + 
+                    geom_point(data = kmeans.data.frame, aes(x = 1:n, y = lloyd, colour = "red")) +
+                    geom_point(data = kmeans.data.frame, aes(x = 1:n, y = forgy, colour = "yellow")) +
+                    geom_point(data = kmeans.data.frame, aes(x = 1:n, y = macqueen, colour = "green")) +
+  
+                    geom_line(data = kmeans.data.frame, aes(x = 1:n, y = hartigan, colour = "blue")) +
+                    geom_line(data = kmeans.data.frame, aes(x = 1:n, y = lloyd, colour = "red")) +
+                    geom_line(data = kmeans.data.frame, aes(x = 1:n, y = forgy, colour = "yellow")) +
+                    geom_line(data = kmeans.data.frame, aes(x = 1:n, y = macqueen, colour = "green")) +
+  
+                    labs(x = "Algoritmo", y = "Cantidad de valores", title = "Benchmark de algoritmos K-MEANS") +
+                    theme(legend.position = c(0.95, 0.5),
+                          legend.justification = c("right", "top")) +
+                    scale_color_manual(name = "Legend", label = c("Hartigan-Wong", "Lloyd", "Forgy", "MacQueen"), values = c("blue", "red", "yellow", "blue"))
+plot1
+```
+
