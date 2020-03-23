@@ -1,0 +1,127 @@
+---
+title: "Kmeans Distancia euclidiana y manhatan"
+date: "`r Sys.Date()`"
+author: "Jorge Emilio Zapata Godoy"
+output:
+  rmdformats::readthedown:
+    highlight: kate
+---
+
+
+```{r setup, echo=FALSE, cache=FALSE}
+library(knitr)
+library(rmdformats)
+
+## Global options
+options(max.print="75")
+opts_chunk$set(echo=TRUE,
+	             cache=TRUE,
+               prompt=FALSE,
+               tidy=TRUE,
+               comment=NA,
+               message=FALSE,
+               warning=FALSE)
+opts_knit$set(width=75)
+```
+
+# Librerias
+```{r Cargando librerias}
+library(DT)
+library(stats)
+library(factoextra)
+library(cclust)
+library(ggpubr)
+library(clustertend)
+```
+
+# Dataset
+Utilizaremos el conjunto de datos proporcionado por R llamado iris
+
+```{r Dataset}
+data <- data.frame(iris)
+DT::datatable(data)
+```
+
+# Escalamiento
+A continuacion escalamos los datos para evitar valores que puedan estar atipicos en el conjunto de datos, conocido como normalización.
+```{r Escalamiento}
+data <- scale(data[,1:4])
+DT::datatable(data)
+```
+
+# Kmeans - Distancia euclideana
+Aplicaremos la distancia euclideana
+```{r Kmeans euclidiana}
+euclidean_matriz <- hclust(d = dist(x = data, method = "euclidean"), method = "complete")
+euclidean_matriz
+```
+
+# Kmeans - Distancia de manhattan
+Aplicaremos la distancia de manhattan
+
+```{r Kmeans manhattan}
+manhattan_matriz <- hclust(dist(x = data, method = "manhattan"), method = "complete")
+manhattan_matriz
+```
+
+# Análisis de los clusters de distancia
+
+## Hopkins
+Usamos Hopkins para ver la tendencia de cluster, si realmente existe alguna agrupación para generar clusters jerárquicos. El resutlado es muy cercano a 0, por lo tanto podemos definir que tiene datos que pueden ser agrupados.
+
+```{r Hopkins}
+hopkins(data = data, n = nrow(data) - 1)
+```
+
+## Seleccionando clusters
+Buscaremos la cantidad de clusters optimos a seleccionar utilizando varias formas, incluyendo el indice de Silhoutte. Utilizando este ultimo obtenemos para ambas distancias que utilicemos 2 clusters como el mas optimo.
+```{r Wss y Silhouette}
+fviz_nbclust(x = data, FUNcluster = kmeans, method = "wss", k.max = 10, diss = get_dist(x = data, method = "euclidean"), linecolor = "green")
+fviz_nbclust(x = data, FUNcluster = kmeans, method = "wss", k.max = 10, diss = get_dist(x = data, method = "manhattan"), linecolor = "red")
+
+fviz_nbclust(x = data, FUNcluster = kmeans, method = "silhouette", k.max = 10, diss = get_dist(x = data, method = "euclidean"), linecolor = "green")
+fviz_nbclust(x = data, FUNcluster = kmeans, method = "silhouette", k.max = 10, diss = get_dist(x = data, method = "manhattan"), linecolor = "red")
+```
+
+## Dendrogramas
+
+### Dendrograma para distancia euclideana
+Obsevamos que se crean dos grupos bien definidos, principalmente el grupo de color rosado.
+```{r Dendrograma euclideana}
+fviz_dend(x = euclidean_matriz, k = 3, cex = 0.2) +
+  geom_hline(yintercept = 5, linetype = "dashed") + 
+  labs(title = "Cluster jerarquico de la distancia euclideana", 
+       subtitle = "Distancia euclidea con K = 3")
+```
+
+### Dendrograma para distancia de manhattan
+Obsevamos que se crean dos grupos bien definidos, dentro de ellos se crean otros dos, sin embargo, en comparación con el anterior, hay un grupo en color rosado que esta relativamente pequeño, significa que puede representar la mejor cantidad de información.
+```{r Dendrograma manhattan}
+fviz_dend(x = manhattan_matriz, k = 4, cex = 0.2) +
+  geom_hline(yintercept = 5, linetype = "dashed") + 
+  labs(title = "Cluster jerarquico de la distancia euclideana", 
+       subtitle = "Distancia euclidea con K = 4")
+```
+
+## Validacion de los clusters
+Realizamos con diferentes técnicas como la de hopkins y Silhouette para verificar la calidad de los clusters.
+
+### Aplicando VAT
+Si observamos tenemos grupos de información utilizando ambas distancias, pero observamos una mejor tendencia en la distancia de manhattan.
+```{r VAT}
+p1 <- fviz_dist(dist.obj = dist(x = data, method = "euclidean"), show_labels = FALSE) +
+      labs(title = "Distancia euclideana") + theme(legend.position = "bottom")
+
+p2 <- fviz_dist(dist.obj = dist(x = data, method = "manhattan"), show_labels = FALSE) +
+      labs(title = "Distancia de manhattan") + theme(legend.position = "bottom")
+
+ggarrange(p1, p2)
+```
+
+### Aplicando eclust()
+Con esta librería conoceremos los índices de silhoutte y porcentajes de la calidad de los clusters creados. Observamos que los porcentajes son altos para los primeros 3 clusters seleccionados y con dos valores que estan negativos que probablemente fueron mal clasificados.
+```{r eclust}
+km.clusters <- eclust(x = data, FUNcluster = "kmeans", k = 3, hc_metric = "euclidean", graph = FALSE)
+km.clusters$silinfo$clus.avg.widths
+DT::datatable(km.clusters$silinfo$widths %>% filter(sil_width <= 0))
+```
