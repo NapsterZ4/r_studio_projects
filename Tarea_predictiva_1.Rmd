@@ -1,0 +1,148 @@
+---
+title: "Tarea predictiva 1 para el conjunto de datos PimaIndiansDiabetes2"
+date: "`r Sys.Date()`"
+author: "Jorge Emilio Zapata Godoy"
+output:
+  rmdformats::readthedown:
+    highlight: kate
+---
+
+```{r setup, echo=FALSE, cache=FALSE}
+library(knitr)
+library(rmdformats)
+
+## Global options
+options(max.print="75")
+opts_chunk$set(echo=TRUE,
+	             cache=TRUE,
+               prompt=FALSE,
+               tidy=TRUE,
+               comment=NA,
+               message=FALSE,
+               warning=FALSE)
+opts_knit$set(width=75)
+```
+
+# Librerias
+```{r Cargando las librerias}
+library(DT)
+library(mlbench)
+library(pastecs)
+library(stats)
+library(ggplot2)
+library(gridExtra)
+library(plotly)
+library(dplyr)
+# Multiple plot function
+#
+# ggplot objects can be passed in ..., or to plotlist (as a list of ggplot objects)
+# - cols:   Number of columns in layout
+# - layout: A matrix specifying the layout. If present, 'cols' is ignored.
+#
+# If the layout is something like matrix(c(1,2,3,3), nrow=2, byrow=TRUE),
+# then plot 1 will go in the upper left, 2 will go in the upper right, and
+# 3 will go all the way across the bottom.
+#
+multiplot <- function(..., plotlist=NULL, file, cols=1, layout=NULL) {
+  library(grid)
+
+  # Make a list from the ... arguments and plotlist
+  plots <- c(list(...), plotlist)
+
+  numPlots = length(plots)
+
+  # If layout is NULL, then use 'cols' to determine layout
+  if (is.null(layout)) {
+    # Make the panel
+    # ncol: Number of columns of plots
+    # nrow: Number of rows needed, calculated from # of cols
+    layout <- matrix(seq(1, cols * ceiling(numPlots/cols)),
+                    ncol = cols, nrow = ceiling(numPlots/cols))
+  }
+
+ if (numPlots==1) {
+    print(plots[[1]])
+
+  } else {
+    # Set up the page
+    grid.newpage()
+    pushViewport(viewport(layout = grid.layout(nrow(layout), ncol(layout))))
+
+    # Make each plot, in the correct location
+    for (i in 1:numPlots) {
+      # Get the i,j matrix positions of the regions that contain this subplot
+      matchidx <- as.data.frame(which(layout == i, arr.ind = TRUE))
+
+      print(plots[[i]], vp = viewport(layout.pos.row = matchidx$row,
+                                      layout.pos.col = matchidx$col))
+    }
+  }
+}
+```
+
+# Cargando el conjunto de datos
+
+```{r Cargando conjunto de datos}
+setwd("/mnt/napster_disk/LEAD University/IQ - 2020/Minería de Datos Avanzada/")
+data <- read.csv(file = "diabetes_prediction.csv", header = TRUE, sep = ",", dec = ".")
+data <- data.frame(data)
+attach(data)
+```
+
+
+# Análisis exploratorio inicial
+
+## Varianzas
+Vemos una desviación estándar importante en la variable **glucosa** y la **insulina** de 30.53 y de 118.77, eventualmente evaluaremos la cantidad de outliers y si nos sirven para el modelo de predicción de la diabetes.
+```{r Analisis inicial}
+DT::datatable(stat.desc(data))
+```
+
+## Valores nulos
+Observamos una cantidad importante de valores nulos en los valores de la variable *insulin* 
+```{r Valores nulos}
+NaValue = function (x) {sum(is.na(x))}
+DT::datatable(data.frame(apply(data, 2, NaValue)))
+```
+
+## Verificando outliers
+
+### Histogramas
+La glucosa se presenta como una distribución relativamente uniforme con relación al resto, igual con "pressure". Algunos valores atípicos alejados de la media en la variable "mass" que comprobaremos con boxplots mas adelante.
+```{r Histogramas}
+# atributes = c("insulin", "triceps", "pressure", "mass", "glucose", "pregnant", "pedigree", "age", "diabetes")
+# plot_lst <- vector("list", length = 9)
+# 
+# for (i in atributes) {
+#   histograms <- ggplot(data = data, aes(data[i])) + geom_histogram(breaks=seq(20, 50, by=2)) + labs(title = "Histogram", x = data[i], y = "count")
+#   plot_lst <- histograms
+# }
+# 
+# cowplot::plot_grid(plotlist = plot_lst, nrow = 4)
+# Por alguna razon esta parte no funciono, pero dejo el codigo por si desea travesearlo
+
+p1 <- qplot(data$pregnant, geom = "histogram", main = "Pregnant", binwidth = 0.5)
+p2 <- qplot(data$glucose, geom = "histogram", main = "Glucose", binwidth = 0.5)
+p3 <- qplot(data$pressure, geom = "histogram", main = "Pressure", binwidth = 0.5)
+p4 <- qplot(data$triceps, geom = "histogram", main = "Triceps", binwidth = 0.5)
+p5 <- qplot(data$insulin, geom = "histogram", main = "Insulin", binwidth = 0.5)
+p6 <- qplot(data$mass, geom = "histogram", main = "Mass", binwidth = 0.5)
+p7 <- qplot(data$pedigree, geom = "histogram", main = "Pedigree", binwidth = 0.5)
+p8 <- qplot(data$age, geom = "histogram", main = "Age", binwidth = 0.5)
+
+multiplot(p1, p2, p3, p4, p5, p6, p7, p8, cols = 2)
+```
+
+### Box plots
+Lo que queremos predecir es la diabetes, es un tipo de variable booleana, por lo tanto podremos hacer boxplots a las variables que vemos outliers en los histogramas para verificar si vale la pena trabajar con ellos.
+
+Observamos muchos datos atipicos en la variable de **insulina**, evaluaremos el modelo con ellos y luego haremos pruebas sin ellos para verificar la predicción.
+```{r Boxplots}
+insulin_boxplot <- plot_ly(data = data, type = "box", name = "Insulin") %>% add_boxplot(x = ~diabetes, y = ~insulin)
+mass_boxplot <- plot_ly(data = data, type = "box", name = "Mass") %>% add_boxplot(x = ~diabetes, y = ~mass)
+triceps_boxplots <- plot_ly(data = data, type  = "box", name = "Triceps") %>% add_boxplot(x = ~diabetes, y = ~triceps)
+
+  
+subplot(insulin_boxplot, mass_boxplot, triceps_boxplots, shareY = TRUE) %>% layout(title = "General boxplot")
+```
+
