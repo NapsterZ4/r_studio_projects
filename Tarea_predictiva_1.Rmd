@@ -45,7 +45,9 @@ library(reshape2)
 library(factoextra)
 library(FactoMineR)
 library(corrplot)
-
+library(MASS)
+library(gbm)
+library(xgboost)
 # Multiple plot function
 #
 # ggplot objects can be passed in ..., or to plotlist (as a list of ggplot objects)
@@ -194,9 +196,9 @@ DT::datatable(data_set1)
 ## Normalización
 Empezaremos por aplicar normalización a todos los datos, si esta técnica no funciona, tendremos que quitar los datos atípicos para poder trabajar sin ellos en un mejor modelo predictivo.
 
-### Eliminar outliers
+### Eliminar outliers en triceps
 Antes de realizar la transformación, haremos una eliminación de valores atipicos para verificar que la transformación sea completamente limpia y suavizarlos.
-```{r Eliminar outliers}
+```{r Eliminar outliers en triceps}
 Q <- quantile(data_set1$triceps, probs = c(0.25, 0.75), na.rm = TRUE)
 iqr <- IQR(data_set1$triceps, na.rm = TRUE)
 
@@ -204,10 +206,23 @@ up_whisker <- min(max(data_set1$triceps), Q[2] + 1.5 * iqr)
 down_whisker <- max(min(data_set1$triceps), Q[1] - 1.5 * iqr)
 
 data_set2 <- subset(data_set1, data_set1$triceps > down_whisker)
-data_set2 <- subset(data_set2, data_set2$triceps < up_whisker)
+data_set2 <- subset(data_set1, data_set1$triceps < up_whisker)
 nrow(data_set2)
+```
 
-data_set2
+### Eliminar outliers en insulin
+```{r Eliminar outliers en insulin}
+Q <- quantile(data_set1$insulin, probs = c(0.25, 0.75), na.rm = TRUE)
+iqr <- IQR(data_set1$insulin, na.rm = TRUE)
+
+up_whisker <- min(max(data_set1$insulin), Q[2] + 1.5 * iqr)
+down_whisker <- max(min(data_set1$insulin), Q[1] - 1.5 * iqr)
+
+data_set2 <- subset(data_set1, data_set1$insulin > down_whisker)
+
+data_set2 <- subset(data_set1, data_set1$insulin < up_whisker)
+
+nrow(data_set2)
 ```
 
 # Cross Validation
@@ -232,8 +247,10 @@ Declaramos los principales algoritmos para hacer la predicción que se encuentra
 - Redes Bayesianas
 - Árboles de decisión
 - Árboles aleatorios (Random Forest)
-```{r Declarando algoritmos}
-# Regresion logistica
+- Gradient Boosting
+
+### Regresión logística
+```{r Regresion logistica}
 
 KfoldsRegresionLogistica <- lapply(kfolds, function(x){
   training.fold <- data_set2[-x, ]
@@ -246,8 +263,11 @@ KfoldsRegresionLogistica <- lapply(kfolds, function(x){
   precision <- (cm[1,1] + cm[2,2]) / (cm[1,1] + cm[2,2] +cm[1,2] + cm[2,1])
   return(precision)
 })
+```
 
-#KNN
+
+### KNN
+```{r KNN}
 KfoldskNN <- lapply(kfolds, function(x){
   training.fold <- data_set2[-x, ]
   test.fold <- data_set2[x, ]
@@ -256,8 +276,10 @@ KfoldskNN <- lapply(kfolds, function(x){
   precision <- (cm[1,1] + cm[2,2]) / (cm[1,1] + cm[2,2] +cm[1,2] + cm[2,1])
   return(precision)
 })
+```
 
-# Support vector machine
+### Support Vector Machine (SVM)
+```{r Support vector machine}
 KfoldsKernelSVM <- lapply(kfolds, function(x){
   training.fold <- data_set2[-x, ]
   test.fold <- data_set2[x, ]
@@ -267,8 +289,12 @@ KfoldsKernelSVM <- lapply(kfolds, function(x){
   precision <- (cm[1,1] + cm[2,2]) / (cm[1,1] + cm[2,2] +cm[1,2] + cm[2,1])
   return(precision)
 })
+```
 
-# Redes bayesianas
+
+### Redes bayesianas
+
+```{r Redes bayesianas}
 KfoldsNaiveBayes <- lapply(kfolds, function(x){
   training.fold <- data_set2[-x, ]
   test.fold <- data_set2[x, ]
@@ -278,8 +304,11 @@ KfoldsNaiveBayes <- lapply(kfolds, function(x){
   precision <- (cm[1,1] + cm[2,2]) / (cm[1,1] + cm[2,2] +cm[1,2] + cm[2,1])
   return(precision)
 })
+```
 
-# Arboles de decision
+### Arboles de decisión
+
+```{r Arboles de decision}
 KfoldsDecisionTree <- lapply(kfolds, function(x){
   training.fold <- data_set2[-x, ]
   test.fold <- data_set2[x, ]
@@ -289,8 +318,11 @@ KfoldsDecisionTree <- lapply(kfolds, function(x){
   precision <- (cm[1,1] + cm[2,2]) / (cm[1,1] + cm[2,2] +cm[1,2] + cm[2,1])
   return(precision)
 })
+```
 
-# RandomForest
+### Random Forest
+
+```{r Random Forest}
 kfoldsRandomForest <- lapply(kfolds, function(x){
   training.fold <- data_set2[-x, ]
   test.fold <- data_set2[x, ]
@@ -300,7 +332,26 @@ kfoldsRandomForest <- lapply(kfolds, function(x){
   precision <- (cm[1,1] + cm[2,2]) / (cm[1,1] + cm[2,2] +cm[1,2] + cm[2,1])
   return(precision)
 })
+```
 
+
+### Gradient boosting
+
+```{r Gradient Boosting}
+kfoldsGradientBoosting <- lapply(kfolds, function(x){
+  training.fold <- data_set2[-x,]
+  test.fold <- data_set2[x,]
+  clasificador <- gbm(diabetes ~ ., data = training.fold, distribution = "gaussian", n.trees = 100, interaction.depth = 4, shrinkage = 0.1)
+  y.pred <- predict(clasificador, newdata = test.fold)
+  cm <- table(test.fold$diabetes, y.pred)
+  precision <- (cm[1,1] + cm[2,2]) / (cm[1,1] + cm[2,2] +cm[1,2] + cm[2,1])
+  return(precision)
+})
+```
+
+## Resultados
+
+```{r Resultados}
 # Sacar de la lista los resultados
 vKfoldsRegresionLogistica <- unlist(KfoldsRegresionLogistica)
 vKfoldskNN <- unlist(KfoldskNN)
@@ -308,15 +359,17 @@ vKfoldsKernelSVM<- unlist(KfoldsKernelSVM)
 vKfoldsNaiveBayes <- unlist(KfoldsNaiveBayes)
 vKfoldsDecisionTree <- unlist(KfoldsDecisionTree)
 vkfoldsRandomForest <- unlist(kfoldsRandomForest)
+# vkfoldsGradientBoosting <- unlist(kfoldsGradientBoosting)
 
 # Convertir los resultados en un dataframe
-df.resultados<-as.data.frame(rbind(
+df.resultados <- as.data.frame(rbind(
   RegresionLogistica = vKfoldsRegresionLogistica,
   KNN = vKfoldskNN,
   SVM = vKfoldsKernelSVM,
   NaiveBayes = vKfoldsNaiveBayes,
   DecisionTree = vKfoldsDecisionTree,
   RandomForest = vkfoldsRandomForest
+  # GradientBoosting = vkfoldsGradientBoosting
 ))
 ```
 
