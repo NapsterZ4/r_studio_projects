@@ -1,0 +1,271 @@
+---
+title: "Tarea predictiva 2 para el conjunto de datos abalone"
+date: "`r Sys.Date()`"
+author: "Jorge Emilio Zapata Godoy"
+output:
+  rmdformats::readthedown:
+    highlight: kate
+---
+
+
+```{r setup, echo=FALSE, cache=FALSE}
+library(knitr)
+library(rmdformats)
+
+## Global options
+options(max.print="75")
+opts_chunk$set(echo=FALSE,
+	             cache=TRUE,
+               prompt=FALSE,
+               tidy=TRUE,
+               comment=NA,
+               message=FALSE,
+               warning=FALSE)
+opts_knit$set(width=75)
+```
+
+# Librerias
+```{r Cargando las librerias}
+library(DT)
+library(mlbench)
+library(pastecs)
+library(stats)
+library(ggplot2)
+library(gridExtra)
+library(plotly)
+library(dplyr)
+library(tidyverse)
+library(boot)
+library(Hmisc)
+library(ggstatsplot)
+library(caret)
+library(randomForest)
+library(e1071)
+library(rpart)
+library(reshape2)
+library(factoextra)
+library(FactoMineR)
+library(corrplot)
+library(AppliedPredictiveModeling)
+# Multiple plot function
+#
+# ggplot objects can be passed in ..., or to plotlist (as a list of ggplot objects)
+# - cols:   Number of columns in layout
+# - layout: A matrix specifying the layout. If present, 'cols' is ignored.
+#
+# If the layout is something like matrix(c(1,2,3,3), nrow=2, byrow=TRUE),
+# then plot 1 will go in the upper left, 2 will go in the upper right, and
+# 3 will go all the way across the bottom.
+#
+multiplot <- function(..., plotlist=NULL, file, cols=1, layout=NULL) {
+  library(grid)
+
+  # Make a list from the ... arguments and plotlist
+  plots <- c(list(...), plotlist)
+
+  numPlots = length(plots)
+
+  # If layout is NULL, then use 'cols' to determine layout
+  if (is.null(layout)) {
+    # Make the panel
+    # ncol: Number of columns of plots
+    # nrow: Number of rows needed, calculated from # of cols
+    layout <- matrix(seq(1, cols * ceiling(numPlots/cols)),
+                    ncol = cols, nrow = ceiling(numPlots/cols))
+  }
+
+ if (numPlots==1) {
+    print(plots[[1]])
+
+  } else {
+    # Set up the page
+    grid.newpage()
+    pushViewport(viewport(layout = grid.layout(nrow(layout), ncol(layout))))
+
+    # Make each plot, in the correct location
+    for (i in 1:numPlots) {
+      # Get the i,j matrix positions of the regions that contain this subplot
+      matchidx <- as.data.frame(which(layout == i, arr.ind = TRUE))
+
+      print(plots[[i]], vp = viewport(layout.pos.row = matchidx$row,
+                                      layout.pos.col = matchidx$col))
+    }
+  }
+}
+```
+
+# Cargando los datos
+```{r Cargando los datos}
+setwd("/mnt/napster_disk/LEAD University/IQ - 2020/Minería de Datos Avanzada/")
+data <- read.csv("abalone_prediction.csv", sep = ",", header = TRUE)
+data <- data.frame(data)
+attach(data)
+```
+
+# Análisis exploratorio inicial
+
+## Varianzas
+Observamos una desviación estándar muy uniforme en todas las variables y poca varianza entre ellas., con máximos y mínimos bien definidos.
+```{r Analisis inicial}
+DT::datatable(stat.desc(data))
+```
+
+## Valores nulos
+El dataset se encuentra completo sin ningun dato faltante.
+```{r Valores nulos}
+NaValue = function (x) {sum(is.na(x))}
+DT::datatable(data.frame(apply(data, 2, NaValue)))
+```
+
+## Verificando outliers
+
+### Histogramas
+En vista que se ven sin ningun tipo de valor atipico, no se visualiza necesario realizar boxplots para detectar outliers ni tampoco hacer imputación.
+```{r Histogramas}
+p1 <- qplot(data$LongestShell, geom = "histogram", main = "LongestShell", binwidth = 0.5)
+p2 <- qplot(data$Diameter, geom = "histogram", main = "Diameter", binwidth = 0.5)
+p3 <- qplot(data$Height, geom = "histogram", main = "Height", binwidth = 0.5)
+p4 <- qplot(data$WholeWeight, geom = "histogram", main = "WholeWeight", binwidth = 0.5)
+p5 <- qplot(data$ShuckedWeight, geom = "histogram", main = "ShuckedWeight", binwidth = 0.5)
+p6 <- qplot(data$VisceraWeight, geom = "histogram", main = "VisceraWeight", binwidth = 0.5)
+p7 <- qplot(data$ShellWeight, geom = "histogram", main = "ShellWeight", binwidth = 0.5)
+p8 <- qplot(data$Rings, geom = "histogram", main = "Rings", binwidth = 0.5)
+
+multiplot(p1, p2, p3, p4, p5, p6, p7, p8, cols = 2)
+```
+
+# Cross Validation
+
+## Kfolds
+Seleccionamos 9 conjuntos de datos para entrenamiento y 1 para pruebas a partir de la libreria **caret**.
+```{r Kfolds}
+kfolds <- createFolds(data$Type, k = 10)
+class(kfolds)
+data_set2 <- na.omit(data) # Por si se colo algun valor nulo
+```
+
+## Declarando algoritmos
+Declaramos los principales algoritmos para hacer la predicción que se encuentran en la lista, se aplica regresión logística porque estamos trabajando con datos a predecir de tipo booleanos.
+
+- Regresión Logística
+- Vecinos mas cercanos (KNN)
+- Suport Vector Machines
+- Redes Bayesianas
+- Árboles de decisión
+- Árboles aleatorios (Random Forest)
+```{r Declarando algoritmos}
+# Regresion logistica
+
+KfoldsRegresionLogistica <- lapply(kfolds, function(x){
+  training.fold <- data[-x, ]
+  test.fold <- data[x, ]
+  clasificador <- glm(Type ~ ., family = binomial, data = training.fold)
+  y.pred <- predict(clasificador, type = 'response', newdata = test.fold)
+  y.pred <- ifelse(y.pred > 0.5, 1, 0)
+  y.pred <- factor(y.pred, levels = c("0", "1"), labels = c("Masculino", "Femenino"))
+  cm <- table(test.fold$Type, y.pred)
+  precision <- (cm[1,1] + cm[2,2]) / (cm[1,1] + cm[2,2] +cm[1,2] + cm[2,1])
+  return(precision)
+})
+
+#KNN
+KfoldskNN <- lapply(kfolds, function(x){
+  training.fold <- data[-x, ]
+  test.fold <- data[x, ]
+  y.pred <- class::knn(training.fold[ , -1], test.fold[ , -1], cl = training.fold[,1], k = 5)
+  cm <- table(test.fold$Type, y.pred)
+  precision <- (cm[1,1] + cm[2,2]) / (cm[1,1] + cm[2,2] +cm[1,2] + cm[2,1])
+  return(precision)
+})
+
+# Support vector machine
+KfoldsKernelSVM <- lapply(kfolds, function(x){
+  training.fold <- data[-x, ]
+  test.fold <- data[x, ]
+  clasificador <- svm(Type ~ ., data = training.fold, type = 'C-classification', kernel = 'radial')
+  y.pred <- predict(clasificador, newdata = test.fold)
+  cm <- table(test.fold$Type, y.pred)
+  precision <- (cm[1,1] + cm[2,2]) / (cm[1,1] + cm[2,2] +cm[1,2] + cm[2,1])
+  return(precision)
+})
+
+# Redes bayesianas
+KfoldsNaiveBayes <- lapply(kfolds, function(x){
+  training.fold <- data[-x, ]
+  test.fold <- data[x, ]
+  clasificador <- naiveBayes(Type ~ ., data = training.fold)
+  y.pred <- predict(clasificador, newdata = test.fold)
+  cm <- table(test.fold$Type, y.pred)
+  precision <- (cm[1,1] + cm[2,2]) / (cm[1,1] + cm[2,2] +cm[1,2] + cm[2,1])
+  return(precision)
+})
+
+# Arboles de decision
+KfoldsDecisionTree <- lapply(kfolds, function(x){
+  training.fold <- data[-x, ]
+  test.fold <- data[x, ]
+  clasificador <- rpart(Type ~ ., data = training.fold)
+  y.pred <- predict(clasificador, newdata = test.fold, type = 'class')
+  cm <- table(test.fold$Type, y.pred)
+  precision <- (cm[1,1] + cm[2,2]) / (cm[1,1] + cm[2,2] +cm[1,2] + cm[2,1])
+  return(precision)
+})
+
+# RandomForest
+kfoldsRandomForest <- lapply(kfolds, function(x){
+  training.fold <- data[-x, ]
+  test.fold <- data[x, ]
+  clasificador <- randomForest(Type ~ ., data = training.fold, ntree = 250)
+  y.pred <- predict(clasificador, newdata = test.fold)
+  cm <- table(test.fold$Type, y.pred)
+  precision <- (cm[1,1] + cm[2,2]) / (cm[1,1] + cm[2,2] +cm[1,2] + cm[2,1])
+  return(precision)
+})
+
+# Sacar de la lista los resultados
+vKfoldsRegresionLogistica <- unlist(KfoldsRegresionLogistica)
+vKfoldskNN <- unlist(KfoldskNN)
+vKfoldsKernelSVM<- unlist(KfoldsKernelSVM)
+vKfoldsNaiveBayes <- unlist(KfoldsNaiveBayes)
+vKfoldsDecisionTree <- unlist(KfoldsDecisionTree)
+vkfoldsRandomForest <- unlist(kfoldsRandomForest)
+
+# Convertir los resultados en un dataframe
+df.resultados<-as.data.frame(rbind(
+  RegresionLogistica = vKfoldsRegresionLogistica,
+  KNN = vKfoldskNN,
+  SVM = vKfoldsKernelSVM,
+  NaiveBayes = vKfoldsNaiveBayes,
+  DecisionTree = vKfoldsDecisionTree,
+  RandomForest = vkfoldsRandomForest
+))
+```
+
+## Visualizando resultados
+Extraemos la información de los algoritmos
+```{r Resultados}
+Medias.Precision <- apply(df.resultados, 1, mean)
+
+df.resultados <- cbind(df.resultados, Medias.Precision)
+
+df.resultados.grafica <- cbind(Metodo = row.names(df.resultados), df.resultados)
+
+df.resultados.grafica <- melt(df.resultados.grafica, id=(c("Metodo")))
+
+colnames(df.resultados.grafica)[2] <- "Fold"
+```
+
+### Tabla de resultados
+El algoritmo ganador es la regresión logistica con un 0.86% de precisión con el algoritmo de Support Vector Machine (SVM).
+```{r Tabla de resultados}
+DT::datatable(df.resultados)
+```
+
+### Gráfico de resultados
+Observamos una tendencia bastante fija y distribuída por todos los algoritmos, excepto la regresión logística sorpresivamente.
+```{r Grafico de resultados}
+graph_results <- ggplot(df.resultados.grafica, aes(x=Fold, y=value, group=Metodo)) +
+     geom_line(aes(color=Metodo))+
+     geom_point(aes(color=Metodo))
+ggplotly(graph_results)
+```
