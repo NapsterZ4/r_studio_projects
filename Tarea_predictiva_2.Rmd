@@ -3,18 +3,18 @@ title: "Tarea predictiva 2 para el conjunto de datos abalone"
 date: "`r Sys.Date()`"
 author: "Jorge Emilio Zapata Godoy"
 output:
-  rmdformats::readthedown:
+  rmdformats::material:
     highlight: kate
 ---
 
 
-```{r setup, echo=FALSE, cache=FALSE}
+```{r setup, echo=TRUE, cache=FALSE}
 library(knitr)
 library(rmdformats)
 
 ## Global options
 options(max.print="75")
-opts_chunk$set(echo=FALSE,
+opts_chunk$set(echo=TRUE,
 	             cache=TRUE,
                prompt=FALSE,
                tidy=TRUE,
@@ -47,6 +47,7 @@ library(factoextra)
 library(FactoMineR)
 library(corrplot)
 library(AppliedPredictiveModeling)
+library(MASS)
 # Multiple plot function
 #
 # ggplot objects can be passed in ..., or to plotlist (as a list of ggplot objects)
@@ -134,6 +135,14 @@ p8 <- qplot(data$Rings, geom = "histogram", main = "Rings", binwidth = 0.5)
 multiplot(p1, p2, p3, p4, p5, p6, p7, p8, cols = 2)
 ```
 
+## Correlaciones
+Se observa una alta correlación con todas las variables, eso significa que podría funcionar mejor utilizando todas las variables.
+```{r Correlaciones}
+correlations <- cor(data[,2:9])
+DT::datatable(head(round(correlations, 2)))
+corrplot(correlations, method = "color")
+```
+
 # Cross Validation
 
 ## Kfolds
@@ -142,6 +151,8 @@ Seleccionamos 9 conjuntos de datos para entrenamiento y 1 para pruebas a partir 
 kfolds <- createFolds(data$Type, k = 10)
 class(kfolds)
 data_set2 <- na.omit(data) # Por si se colo algun valor nulo
+
+data_set2[,c(2:9)] <- scale(data_set2[,c(2:9)])
 ```
 
 ## Declarando algoritmos
@@ -153,8 +164,10 @@ Declaramos los principales algoritmos para hacer la predicción que se encuentra
 - Redes Bayesianas
 - Árboles de decisión
 - Árboles aleatorios (Random Forest)
-```{r Declarando algoritmos}
-# Regresion logistica
+- Gradient Boosting
+- Análisis de Discriminante Lineal
+```{r Regresion logistica}
+### Regresion logistica
 
 KfoldsRegresionLogistica <- lapply(kfolds, function(x){
   training.fold <- data[-x, ]
@@ -167,8 +180,10 @@ KfoldsRegresionLogistica <- lapply(kfolds, function(x){
   precision <- (cm[1,1] + cm[2,2]) / (cm[1,1] + cm[2,2] +cm[1,2] + cm[2,1])
   return(precision)
 })
+```
 
-#KNN
+### KNN
+```{r KNN}
 KfoldskNN <- lapply(kfolds, function(x){
   training.fold <- data[-x, ]
   test.fold <- data[x, ]
@@ -177,8 +192,11 @@ KfoldskNN <- lapply(kfolds, function(x){
   precision <- (cm[1,1] + cm[2,2]) / (cm[1,1] + cm[2,2] +cm[1,2] + cm[2,1])
   return(precision)
 })
+```
 
-# Support vector machine
+
+### Support vector machine
+```{r Support vector machine}
 KfoldsKernelSVM <- lapply(kfolds, function(x){
   training.fold <- data[-x, ]
   test.fold <- data[x, ]
@@ -188,8 +206,10 @@ KfoldsKernelSVM <- lapply(kfolds, function(x){
   precision <- (cm[1,1] + cm[2,2]) / (cm[1,1] + cm[2,2] +cm[1,2] + cm[2,1])
   return(precision)
 })
+```
 
-# Redes bayesianas
+### Redes bayesianas
+```{r Redes bayedianas}
 KfoldsNaiveBayes <- lapply(kfolds, function(x){
   training.fold <- data[-x, ]
   test.fold <- data[x, ]
@@ -199,8 +219,11 @@ KfoldsNaiveBayes <- lapply(kfolds, function(x){
   precision <- (cm[1,1] + cm[2,2]) / (cm[1,1] + cm[2,2] +cm[1,2] + cm[2,1])
   return(precision)
 })
+```
 
-# Arboles de decision
+
+### Árboles de decisión
+```{r Arboles de decision}
 KfoldsDecisionTree <- lapply(kfolds, function(x){
   training.fold <- data[-x, ]
   test.fold <- data[x, ]
@@ -210,8 +233,10 @@ KfoldsDecisionTree <- lapply(kfolds, function(x){
   precision <- (cm[1,1] + cm[2,2]) / (cm[1,1] + cm[2,2] +cm[1,2] + cm[2,1])
   return(precision)
 })
+```
 
-# RandomForest
+### RandomForest
+```{r Random Forest}
 kfoldsRandomForest <- lapply(kfolds, function(x){
   training.fold <- data[-x, ]
   test.fold <- data[x, ]
@@ -221,29 +246,66 @@ kfoldsRandomForest <- lapply(kfolds, function(x){
   precision <- (cm[1,1] + cm[2,2]) / (cm[1,1] + cm[2,2] +cm[1,2] + cm[2,1])
   return(precision)
 })
+```
 
-# Sacar de la lista los resultados
+### Gradient Boosting
+```{r Gradient Boosting}
+indexes <- createDataPartition(data$Type, p = .80, list = F)
+
+kfoldsGradientBoosting <- function(indexes){
+  train <- data[indexes, ]
+  test <- data[-indexes, ]
+  test_x <- test[,-1]
+  test_y <- test[,1]
+  model <- train(Type ~ ., data = train, method = "gbm")
+  pred_y <- predict(model, test_x)
+  cm <- table(test$Type, pred_y)
+  precision <- (cm[1,1] + cm[2,2]) / (cm[1,1] + cm[2,2] +cm[1,2] + cm[2,1])
+  return(precision)
+}
+```
+
+### Analisis de discriminante lineal
+```{r Analisis discriminante lineal}
+kfoldsLinealDiscriminant <- lapply(kfolds, function(x){
+  training.fold <- data[-x, ]
+  test.fold <- data[x, ]
+  clasificador <- lda(Type ~ ., data = training.fold)
+  y.pred <- predict(clasificador, newdata = test.fold)
+  cm <- table(test.fold$Type, y.pred$class)
+  precision <- (cm[1,1] + cm[2,2]) / (cm[1,1] + cm[2,2] +cm[1,2] + cm[2,1])
+  return(precision)
+})
+```
+
+# Lista de resultados
+```{r Resultados}
+# Sacar los resultados en una lista
 vKfoldsRegresionLogistica <- unlist(KfoldsRegresionLogistica)
 vKfoldskNN <- unlist(KfoldskNN)
 vKfoldsKernelSVM<- unlist(KfoldsKernelSVM)
 vKfoldsNaiveBayes <- unlist(KfoldsNaiveBayes)
 vKfoldsDecisionTree <- unlist(KfoldsDecisionTree)
 vkfoldsRandomForest <- unlist(kfoldsRandomForest)
+vkfoldsGradientBoosting <- unlist(kfoldsGradientBoosting(indexes = indexes))
+vkfoldsLinealDiscriminant <- unlist(kfoldsLinealDiscriminant)
 
 # Convertir los resultados en un dataframe
-df.resultados<-as.data.frame(rbind(
+df.resultados <- as.data.frame(rbind(
   RegresionLogistica = vKfoldsRegresionLogistica,
   KNN = vKfoldskNN,
   SVM = vKfoldsKernelSVM,
   NaiveBayes = vKfoldsNaiveBayes,
   DecisionTree = vKfoldsDecisionTree,
-  RandomForest = vkfoldsRandomForest
+  RandomForest = vkfoldsRandomForest,
+  GradientBoosting = vkfoldsGradientBoosting,
+  LinealDiscriminant = vkfoldsLinealDiscriminant
 ))
 ```
 
 ## Visualizando resultados
 Extraemos la información de los algoritmos
-```{r Resultados}
+```{r Visualizazcion de Resultados}
 Medias.Precision <- apply(df.resultados, 1, mean)
 
 df.resultados <- cbind(df.resultados, Medias.Precision)
@@ -256,7 +318,7 @@ colnames(df.resultados.grafica)[2] <- "Fold"
 ```
 
 ### Tabla de resultados
-El algoritmo ganador es la regresión logistica con un 0.86% de precisión con el algoritmo de Support Vector Machine (SVM).
+El algoritmo ganador es la regresión logistica con un 0.86% de precisión con el algoritmo de Support Vector Machine (SVM) y tambien un buen rendimiento del análisis de discriminante que nos funciona para mas categorías
 ```{r Tabla de resultados}
 DT::datatable(df.resultados)
 ```
