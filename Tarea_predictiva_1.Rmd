@@ -235,7 +235,6 @@ class(kfolds)
 data_set2 <- na.omit(data_set2) # Por si se colo algun valor nulo
 
 data_set2[,c(1:8)] <- scale(data_set2[,c(1:8)])
-data_set2
 ```
 
 ## Declarando algoritmos
@@ -247,7 +246,6 @@ Declaramos los principales algoritmos para hacer la predicción que se encuentra
 - Redes Bayesianas
 - Árboles de decisión
 - Árboles aleatorios (Random Forest)
-- Gradient Boosting
 
 ### Regresión logística
 ```{r Regresion logistica}
@@ -264,7 +262,6 @@ KfoldsRegresionLogistica <- lapply(kfolds, function(x){
   return(precision)
 })
 ```
-
 
 ### KNN
 ```{r KNN}
@@ -291,9 +288,7 @@ KfoldsKernelSVM <- lapply(kfolds, function(x){
 })
 ```
 
-
 ### Redes bayesianas
-
 ```{r Redes bayesianas}
 KfoldsNaiveBayes <- lapply(kfolds, function(x){
   training.fold <- data_set2[-x, ]
@@ -307,7 +302,6 @@ KfoldsNaiveBayes <- lapply(kfolds, function(x){
 ```
 
 ### Arboles de decisión
-
 ```{r Arboles de decision}
 KfoldsDecisionTree <- lapply(kfolds, function(x){
   training.fold <- data_set2[-x, ]
@@ -321,7 +315,6 @@ KfoldsDecisionTree <- lapply(kfolds, function(x){
 ```
 
 ### Random Forest
-
 ```{r Random Forest}
 kfoldsRandomForest <- lapply(kfolds, function(x){
   training.fold <- data_set2[-x, ]
@@ -334,19 +327,20 @@ kfoldsRandomForest <- lapply(kfolds, function(x){
 })
 ```
 
-
-### Gradient boosting
-
+### Gradient Boosting
 ```{r Gradient Boosting}
-kfoldsGradientBoosting <- lapply(kfolds, function(x){
-  training.fold <- data_set2[-x,]
-  test.fold <- data_set2[x,]
-  clasificador <- gbm(diabetes ~ ., data = training.fold, distribution = "gaussian", n.trees = 100, interaction.depth = 4, shrinkage = 0.1)
-  y.pred <- predict(clasificador, newdata = test.fold)
-  cm <- table(test.fold$diabetes, y.pred)
+indexes = createDataPartition(data_set2$diabetes, p = .85, list = FALSE)
+kfoldsGradientBoosting <- function(indexes){
+  train <- data_set2[indexes, ]
+  test <- data_set2[-indexes, ]
+  test_x <- test[,-9]
+  test_y <- test[,9]
+  model <- train(diabetes ~ ., data = train, method = "gbm")
+  pred_y <- predict(model, test_x)
+  cm <- table(test$diabetes, pred_y)
   precision <- (cm[1,1] + cm[2,2]) / (cm[1,1] + cm[2,2] +cm[1,2] + cm[2,1])
   return(precision)
-})
+}
 ```
 
 ## Resultados
@@ -359,7 +353,7 @@ vKfoldsKernelSVM<- unlist(KfoldsKernelSVM)
 vKfoldsNaiveBayes <- unlist(KfoldsNaiveBayes)
 vKfoldsDecisionTree <- unlist(KfoldsDecisionTree)
 vkfoldsRandomForest <- unlist(kfoldsRandomForest)
-# vkfoldsGradientBoosting <- unlist(kfoldsGradientBoosting)
+vkfoldsGradientBoosting <- unlist(kfoldsGradientBoosting(indexes = indexes))
 
 # Convertir los resultados en un dataframe
 df.resultados <- as.data.frame(rbind(
@@ -368,14 +362,14 @@ df.resultados <- as.data.frame(rbind(
   SVM = vKfoldsKernelSVM,
   NaiveBayes = vKfoldsNaiveBayes,
   DecisionTree = vKfoldsDecisionTree,
-  RandomForest = vkfoldsRandomForest
-  # GradientBoosting = vkfoldsGradientBoosting
+  RandomForest = vkfoldsRandomForest,
+  GradientBoosting = vkfoldsGradientBoosting
 ))
 ```
 
 ## Visualizando resultados
 Extraemos la información de los algoritmos
-```{r Resultados}
+```{r Visualizacion de Resultados}
 Medias.Precision <- apply(df.resultados, 1, mean)
 
 df.resultados <- cbind(df.resultados, Medias.Precision)
@@ -388,7 +382,7 @@ colnames(df.resultados.grafica)[2] <- "Fold"
 ```
 
 ### Tabla de resultados
-El algoritmo ganador es la regresión logistica con un 0.77% de precisión.
+El algoritmo ganador es el GradientBoosting con un 0.82% de precisión.
 ```{r Tabla de resultados}
 DT::datatable(df.resultados)
 ```
