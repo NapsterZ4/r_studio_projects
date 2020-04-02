@@ -1,0 +1,384 @@
+---
+title: "Support Vector Machines"
+author: "Jorge Emilio Zapata Godoy"
+date: "`r Sys.Date()`"
+output:
+  rmdformats::readthedown:
+    highlight: kate
+---
+
+```{r setup, echo=FALSE, cache=FALSE}
+library(knitr)
+library(rmdformats)
+
+## Global options
+options(max.print="75")
+opts_chunk$set(echo=TRUE,
+	             cache=TRUE,
+               prompt=FALSE,
+               tidy=TRUE,
+               comment=NA,
+               message=FALSE,
+               warning=FALSE)
+opts_knit$set(width=75)
+```
+
+# Máquinas de soporte vectorial (SVM)
+La idea central de las máquinas de soporte vectorial fue desarrollada por Vladimir Vapnik en 1998. Se puede ver la solución de manera intuitiva construyendo un clasificador para un problema de dos clases linealmente separables en el plano. Es utilizado en problemas de clasificación de patrones y regresión no lineal. La idea básica extraída de esta figura se puede resumir mediante el truco del núcleo (kernel), es decir, la forma de resolver un problema de separación no lineal mapeando los puntos originales no linealmente separables en un espacio de dimensiones superiores, donde se utiliza subsecuentemente un clasificador lineal. Utiliza un mapeo no lineal para transformar los datos de entrenamiento originales en una dimensión superior. Dentro de esta nueva dimensión, busca el hiperplano de separación óptimo lineal (es decir, un "límite de decisión" separando las tuplas de una clase de otra).
+
+![Vectores de soporte](/mnt/napster_disk/LEAD University/IQ - 2020/Minería de Datos Avanzada/Exposiciones/svm1.png)
+
+Separación óptima de hiperplanos, en la cual maximiza la distancia desde el hiperplano hasta los puntos mas cercanos.
+
+![Separación óptima del hiperplano](/mnt/napster_disk/LEAD University/IQ - 2020/Minería de Datos Avanzada/Exposiciones/svm2.png)
+
+El hiperplano n-dimensional, se puede representar en un gráfico de la siguiente manera:
+
+![Hiper plano n-dimensional](/mnt/napster_disk/LEAD University/IQ - 2020/Minería de Datos Avanzada/Exposiciones/svm5.png)
+
+# Datos linealmente separables
+Los círculos sólidos y los cuadrados vacíos indican los valores de X para dos clases etiquetadas de 1 y -1 que son linealmente separables.
+
+![Estos paneles muestran cuatro formas de separar las dos clases. En (a), el límite intenta dibujar Un camino alrededor de una clase. En (b) y (c), el límite está fuertemente afectado por puntos que pueden no ser representante de la nube de datos. En (d), el límite corre por la mitad del margen entre el nubes de datos](/mnt/napster_disk/LEAD University/IQ - 2020/Minería de Datos Avanzada/Exposiciones/svm3.png)
+
+![Representación gráfica de la separación de planos](/mnt/napster_disk/LEAD University/IQ - 2020/Minería de Datos Avanzada/Exposiciones/svm7.png)
+
+![Representación de datos linealmente separables](/mnt/napster_disk/LEAD University/IQ - 2020/Minería de Datos Avanzada/Exposiciones/svm12.png)
+## Explicación formal
+Considere los siguientes puntos:
+
+$$\left\{(x_{1}, c_{1}),(x_{2}, c_{2}), ... ,(x_{n}, c_{n}) \right\}$$
+
+Cada punto de datos es un vector n-dimensional, generalmente con valores escalados entre [-1, 1], es importante protegerlo contra datos de mucha varianza porque podría dominar la clasificación. Esto denota la clasificación correcta que nos gustaría que el SVM distinga eventualmente en nuestros datos por medio del hiperplano divisorio que toma la siguiente forma:
+
+$${w*x-b = 0}$$
+
+Donde el vector de $w$ es:
+
+$$x = \left(w_{1}, w_{2}, ... , w_{p} \right)^T \epsilon R^p$$
+
+![Vector w](/mnt/napster_disk/LEAD University/IQ - 2020/Minería de Datos Avanzada/Exposiciones/svm6.png)
+
+El vector $w$ apunta perpendicular al hiperplano de separación agregando el parámetro de compensación $b$ que nos permite aumentar el margen en el cual el hiperplano se ve obligado a pasar por el origen, restringiendo la solución. Como nos interesa el margen máximo, estamos interesados en los vectores de soporte y los hiperplanos paralelos $w$ mas cercanos a estos vectores de soporte. Los hiperplanos paralelos (vectores de soporte) pueden describirse mediante las siguientes ecuaciones:
+
+$${w*x-b = -1}$$
+$${w*x-b = 1}$$
+
+Si los datos de entrenamiento son linealmente separables, podemos seleccionar hiperplanos para que maximice su distancia que es $\frac{2}{\lVert{w}\rVert}$, por lo que queremos minimizar ${\lVert{w}\rVert}$, por esta razón necesito asegurar que:
+
+$${w*x-b \geq 1}$$
+$${w*x-b \leq 1}$$
+
+También representado como:
+
+$$c_{i}\left(w*x_{i}-b\right) \geq 1, 1\leq i \leq n$$
+
+![Separación máxima entre hiperplanos](/mnt/napster_disk/LEAD University/IQ - 2020/Minería de Datos Avanzada/Exposiciones/svm4.png)
+
+## Variables de holgura
+En 1995, Cortes y Vapnik sugirieron una idea de margen máximo modificada que permite ejemplos mal etiquetados. 1 Si no existe un hiperplano que pueda dividir los ejemplos de "sí" y "no", el método de Margen Suave elegirá un hiperplano que divida los ejemplos de la manera más limpia posible, mientras maximiza la distancia a los ejemplos de división limpia más cercanos. Este trabajo popularizó la expresión Support Vector Machine o SVM. El método introduce variables de holgura:
+
+$$c_{i}\left(w*x_{i}-b\right) \geq 1 - \xi_{i}, 1\leq i \leq n$$
+
+Donde $\xi$ es igual a:
+
+$$min\lVert{w}\rVert^2 + C\sum_i\xi_{i}$$
+
+![El límite de decisión suave para un problema de dicotomización con superposición de datos. Línea de separación (continua), márgenes (punteados) y vectores de soporte (puntos de datos de entrenamiento texturizados). 4 Support Vector en clase positiva (círculos) y 3 Support Vector en clase negativa (cuadrados). 2 clasificaciones erróneas para clase positiva y 1 clasificación errónea para clase negativa](/mnt/napster_disk/LEAD University/IQ - 2020/Minería de Datos Avanzada/Exposiciones/svm8.png)
+
+# Datos linealmente inseparables
+El algoritmo original de hiperplano propuesto por Vladimir Vapnik en 1963, mientras era estudiante de doctorado en el Instituto de Ciencia de Control en Moscú, era un clasificador lineal como el mostrado. Sin embargo, en 1992, Bernhard Boser, Isabelle Guyon y Vapnik sugirieron una forma de crear clasificadores no lineales aplicando el truco del núcleo (originalmente propuesto por Aizerman) a los hiperplanos de margen máximo. El algoritmo resultante es formalmente similar, excepto que cada producto de punto es reemplazado por una función de núcleo no lineal.
+
+![Una SVM no lineal sin superposición de datos. Una verdadera separación es la curva cuadratica. Se muestran la línea de separación no lineal (continua), la lineal (discontinua) y los puntos de datos mal clasificados por la línea de separación lineal (los puntos de datos de entrenamiento texturizados). Hay 4 datos negativos mal clasificados y 2 tonos positivos mal clasificados](/mnt/napster_disk/LEAD University/IQ - 2020/Minería de Datos Avanzada/Exposiciones/svm9.png)
+
+Tabla general de núcleos o kernels mas usados:
+
+![Kernels](/mnt/napster_disk/LEAD University/IQ - 2020/Minería de Datos Avanzada/Exposiciones/svm10.png)
+
+Cada uno de estos resultados en un clasificador no lineal diferente en el espacio de entrada. No hay reglas de oro para determinar qué núcleo admisible dará como resultado el SVM más preciso. En la práctica, el núcleo elegido generalmente no hace una gran diferencia en  precisión resultante El entrenamiento de SVM siempre encuentra una solución global, a diferencia de las redes neuronales como el Retropropagación (backpropagation) donde generalmente existen muchos mínimos locales.
+
+## Polinomial
+La mayor ventaja de la familia polinomial de núcleos radica en el hecho de que son generalizaciones directas de la conocida norma euclidiana y, por lo tanto, intuitivamente interpretable. 
+
+$$K(X i , X j ) = (X i · X j + 1) ^ h$$
+
+Intuitivamente, el núcleo polinomial observa no solo las características dadas de las muestras de entrada para determinar su similitud, sino también las combinaciones de estas. En el contexto del análisis de regresión, tales combinaciones se conocen como características de interacción.
+
+![El hiperplano aprendido en el espacio de características por un SVM es una elipse en el espacio de entrada.](/mnt/napster_disk/LEAD University/IQ - 2020/Minería de Datos Avanzada/Exposiciones/svm11.png)
+
+## Radial Gaussiano (Gaussian)
+Los aficionados a las redes neuronales estarán interesados en observar que los hiperplanos de decisión resultantes encontrados para SVM no lineales son del mismo tipo que los encontrados por otros clasificadores de redes neuronales conocidos. Por ejemplo, un SVM con una función de base radial gaussiana (RBF) proporciona el mismo hiperplano de decisión que un tipo de red neuronal conocida como red de función de base radial denominada por:
+
+$$K(x_{i}, x_{j}) = e^{\frac{\lVert x_{i} − x_{j} \rVert 2}{2σ^2}}$$
+Es similar al kernel de Laplace, pero el sigma $\sigma$ es lineal.
+
+![Kernel radial gaussiano](/mnt/napster_disk/LEAD University/IQ - 2020/Minería de Datos Avanzada/Exposiciones/svm13.png)
+
+## Sigmoidal
+Una Máquina de soportes vectoriales SVM con un núcleo sigmoide es equivalente a una red neuronal de dos capas simple conocida como perceptrón multicapa (sin capas ocultas) que esta denominada por:
+
+$$K(X_{i}, X_{j}) = tanh(kX_{i} · X_{j} - \delta)$$
+
+![Tangente hiperbólica](/mnt/napster_disk/LEAD University/IQ - 2020/Minería de Datos Avanzada/Exposiciones/svm14.png)
+
+# Regresión con SVM
+Se propuso una versión de un SVM para regresión llamada vector de soporte regresión (SVR). El modelo producido por la clasificación del vector de soporte solo depende de un subconjunto de los datos de entrenamiento, porque la función de costo para construir el modelo no se preocupa por los puntos de entrenamiento que se encuentran más allá del margen. De manera análoga, el modelo producido por SVR solo depende de un subconjunto de los datos de entrenamiento, porque la función de costo para construir el modelo ignora cualquier dato de entrenamiento que esté cerca (dentro de un umbral) a la predicción del modelo.
+
+La diferencia clave entre la clasificación del vector de soporte y la regresión del vector de soporte radica en el modelo de ruido y la función de pérdida; el paradigma de maximización de un margen sigue siendo el mismo. Vapnik llama a la función de pérdida utilizada para la regresión vectorial de soporte $ε-pérdida$ insensible, definida de la siguiente manera: Sea $ε > 0$ y establezca
+
+$$l(u) = \mid u \mid_{\epsilon} \begin{cases}0, & \mid u \mid < \epsilon\\\mid u \mid - \epsilon, & otherwise\end{cases}$$
+Se ve que esta función de pérdida asigna la pérdida cero a cualquier error menor de $\epsilon$ de donde viene el nombre. Esto significa que cualquier función mas cercana a $\epsilon$ es un buen candidato.
+
+Se bserva que la función de pérdida insensible $\epsilon$ también proporciona cierta robustez frente a los valores atípicos. El uso de la pérdida insensible $\epsilon$ para la regresión equivale a tratar la función de regresión como un límite de decisión como se busca en la clasificación. Esto es válido porque el $\epsilon$-insensible, su pérdida corresponde a una interpretación de optimización de margen. Es decir, soporte vector regression estima la verdadera función construyendo un tubo a su alrededor, el tubo define un margen fuera del cual la desviación se trata como ruido.
+
+## Predicción lineal
+La función utilizada para predecir nuevos valores depende solo de los vectores de soporte:
+
+$$f(x) = \sum_{n=1}^N (\alpha_{n} - \alpha_{n}^*)(x\prime_{n}x) + b$$
+
+
+## Predicción cuadrática y multifuncional
+La fórmula dual para la regresión SVM no lineal reemplaza el producto interno de los predictores $(x_{i}, x\prime_{j})$ con el elemento correspondiente de la matriz de $Gram(g_{i},j)$.
+
+$$f(x) = \sum_{n=1}^N (\alpha_{n} - \alpha_{n}^*)G(x\prime_{n}x) + b$$
+
+La matriz de Gram es una matriz n por n que contiene elementos $g_{i}$, $j = G (x_{i}, x_{j})$. Cada elemento gi, j es igual al producto interno de los predictores transformados por φ. Sin embargo, no necesitamos saber φ, porque podemos usar la función del núcleo para generar la matriz de Gram directamente. Usando este método, SVM no lineal encuentra la función óptima $F(x)$ en el espacio predictor transformado.
+
+# SVM multiclase
+Cuando K es demasiado grande con un vector ($K - 1) $K$dimensional $g$ vector.
+
+$$g (f(x), y) = ( f_{y}(x) − f_{1}(x), . . . , f_{y}(x) − f_{y−1}(x), f_{y}() − f_{y+1}(x),...,f_{y}(x) − f_{K}(x)).$$
+
+La función de recuperación o de pérdida de información es la siguiente:
+
+$$\sum_{i=1}^{n}l(y_{i}, f_{(xi)}) = \sum_{i=1}^{n} \sum_{k\neq y_{i}}^{}\left[ f_{k}(x_{i}+1)\right]_{+}$$
+
+# Deployment
+El desarrollo de ANN siguió un camino heurístico, con aplicaciones y amplia experimentación previa a la teoría. Por el contrario, el desarrollo de las SVM involucraron primero una teoría sólida, luego la implementación y la experiencia. Una ventaja significativa de los SVM es que si bien los ANN pueden sufrir desde múltiples mínimos locales, la solución a un SVM es global y única. Una ventaja más de las SVM son que tienen una geometría simple a diferencia de las ANN. La complejidad de los SVM no depende de la dimensionalidad de la entrada espacio. Las ANN usan la minimización empírica del riesgo, mientras que las SVM usan estructural minimización de riesgos. La razón por la que las SVM a menudo superan a las ANN en la práctica a veces es que lidian con el mayor problema con las ANN, las SVM son menos propenso a un ajuste excesivo.
+
+![Modelo de desarrollo del SVM](/mnt/napster_disk/LEAD University/IQ - 2020/Minería de Datos Avanzada/Exposiciones/svm15.png)
+
+# Desventajas
+
+- Además de las ventajas de los SVM (desde un punto de vista práctico), tiene algunas limitaciones. Una pregunta práctica importante que no es del todo resuelto, es la selección de los parámetros de la función del núcleo.
+
+- Una segunda limitación es la velocidad y el tamaño, tanto en entrenamiento como en pruebas. Eso implica cálculos complejos y que requieren mucho tiempo. Desde un punto de vista práctico quizás el problema más serio con SVMs es la alta complejidad algorítmica y amplios requisitos de memoria.
+
+- El procesamiento de datos discretos presenta otro problema porque las SVM se basan en un sonido teórico. La base y la solución que produce son de naturaleza global y única (como en oposición a quedarse atascado en los mínimos locales).
+
+#  Ejemplo práctico
+
+## Librerias
+
+```{r Librerias}
+library(tidyverse)    # data manipulation and visualization
+library(kernlab)      # SVM methodology
+library(e1071)        # SVM methodology
+library(ISLR)         # contains example data set "Khan"
+library(RColorBrewer) # customized coloring of plots
+library(DT)
+```
+
+## Set de datos
+```{r Set de datos}
+data <- iris
+data <- subset(data, data$Species != "virginica")
+
+x <- cbind(data$Sepal.Length, data$Sepal.Width)
+y <- data$Species
+
+dat <- data.frame(x = x, y = as.factor(y))
+DT::datatable(dat)
+```
+
+## Grafica inicial
+```{r Grafica inicial}
+ggplot(data = dat, aes(x = x.2, y = x.1, color = y, shape = y)) + 
+  geom_point(size = 2) + 
+  scale_color_manual(values = c("#000000", "#FF0000")) + 
+  theme(legend.position = "right") +
+  labs(title = "Clases de plantas", x = "X2", y = "X1")
+```
+
+## Aplicando SVM con e1071
+
+Observamos los vectores de soporte marcados con una "X". Los puntos marcados con una "O" son los puntos que no afectan al cálculo de la línea, este principio sentará las bases para las máquinas de vectores de soporte 
+```{r Aplicando SVM con e1071}
+svmfit <- svm(y ~., data = dat, kernel = "linear", scale = FALSE)
+plot(svmfit, dat)
+```
+
+## Atributos principales del SVM
+Los principales atributos es la form de visualizar la salida del modelo.
+```{r Atributos principales del SVM}
+#Indice de vectores de soporte
+svmfit$index
+
+#Coeficientes
+svmfit$coefs
+
+#Termino independiente
+svmfit$rho
+
+```
+
+## Graficando los vectores de soporte
+Como es de recordar:
+$${w*x-b = 0}$$
+$${w*x-b \geq 1}$$
+$${w*x-b \leq 1}$$
+
+Aplicamos y visualizamos los vectores de soporte
+```{r Aplicando los vectores de soporte}
+# w <- drop(t(svmfit$coefs) %*% x[svmfit$index,])
+# w0 <- svmfit$rho
+# 
+# plot(svmfit, dat)
+# abline(w0 / w[2], -w[1] / w[2])
+# 
+# #Muestra las lineas con un corrimiento de un valor
+# abline((w0 - 1) / w[2], -w[1] / w[2], lty = 2)
+# abline((w0 + 1) / w[2], -w[1] / w[2], lty = 2)
+
+
+scatter_plot <- ggplot(data = dat, aes(x = x.1, y = x.2, color = y)) + geom_point()
+scatter_plot
+
+layered_plot <- scatter_plot + geom_line(data = dat[svmfit$index,], aes(x = x.1, y = x.2), color = "purple", size = 4, alpha = 0.5)
+layered_plot
+```
+
+
+## Aplicando SVM con Kern
+Muestra un poco mas de detalles usando colores gradientes que indica como se clasificaría un nuevo punto en función de sus características.
+```{r Aplicando SVM con kern}
+kernfit <- ksvm(x, y, type = "C-svc", kernel = 'vanilladot')
+plot(kernfit, data = x)
+```
+
+## Clasificación con SVM
+Sin embargo, en el caso de los datos que no son linealmente separables, el argumento costo = adquiere una importancia real. Esto cuantifica la penalización asociada con tener una observación en el lado equivocado del límite de clasificación. Podemos trazar el ajuste de la misma manera que el caso completamente separable. 
+```{r Clasificacion con SVM}
+svmfit <- svm(y ~., data = dat, kernel = "linear", cost = 0.001)
+plot(svmfit, dat)
+```
+
+## Predicción con mejor ajuste lineal
+¿Cómo decidimos qué tan costosas son estas clasificaciones erróneas? En lugar de especificar un costo por adelantado, podemos usar la función tune () de e1071 para probar varios costos e identificar qué valor produce el mejor modelo de ajuste.
+
+```{r Prediccion con mejor ajuste lineal}
+tune.out <- tune(svm, y~., data = dat, kernel = "linear", ranges = list(cost = c(0.001, 0.01, 0.1, 1, 5, 10, 100)))
+bestmod <- tune.out$best.model
+
+bestmod
+```
+
+## Clasificación
+En nuestro modelo se calcula que el costo es de 5 el mas óptimo lo que no penaliza mucho el modelo por observaciones mal clasificadas. Probaremos su nivel de clasificación a partir de la configuración anterior.
+
+```{r Clasificacion}
+ypred <- predict(bestmod, dat)
+cm <- table(predict = ypred, truth = dat$y)
+cm
+```
+
+## Clasificación no lineal
+En este caso utilizaremos el kernel radial para demostrar la clasificación de datos no lineales.
+
+Al notar el resultado de la gráfica observas que los datos no son linealmente separables, por lo tanto nos conviene utilizar el kernel de función radial.
+```{r Clasificacion no lineal}
+x <- matrix(rnorm(200*2), ncol = 2)
+x[1:100,] <- x[1:100,] + 2.5
+x[101:150,] <- x[101:150,] - 2.5
+y <- c(rep(1,150), rep(2,50))
+dat <- data.frame(x=x,y=as.factor(y))
+
+ggplot(data = dat, aes(x = x.2, y = x.1, color = y, shape = y)) + 
+  geom_point(size = 2) +
+  scale_color_manual(values=c("#000000", "#FF0000")) +
+  theme(legend.position = "none")
+```
+
+## Clasificación con kernel radial con e1071
+
+```{r Kernel radial e1071}
+set.seed(123)
+train <- sample(200, 100, replace = FALSE)
+svmfit <- svm(y~., data = dat[train,], kernel = "radial", gamma = 1, cost = 1)
+plot(svmfit, dat)
+```
+
+## Clasificación con kernel radial con Kern
+```{r Clasificacion radial con kern}
+kernfit <- ksvm(x[train,],y[train], type = "C-svc", kernel = 'rbfdot', C = 1, scaled = c())
+
+plot(kernfit, data = x[train,])
+```
+
+
+## Modelo óptimo para clasificación radial
+En este caso nos indica que el mejor modelo optimo para clasificar es cuando el costo es igual a 1 con 25 vectores de soporte.
+```{r Modelo optimo para clasificacion radial}
+tune.out <- tune(svm, y~., data = dat[train,], kernel = "radial", ranges = list(cost = c(0.1,1,10,100,1000), gamma = c(0.5,1,2,3,4)))
+
+tune.out$best.model
+```
+
+## Predicción con mejor ajuste radial
+```{r Prediccion con mejor ajuste radial}
+valid <- table(true = dat[-train,"y"], pred = predict(tune.out$best.model, newx = dat[-train,]))
+valid
+```
+
+## SVM con multiples clases
+
+```{r SVM con multiples clases}
+x <- rbind(x, matrix(rnorm(50*2), ncol = 2))
+y <- c(y, rep(0,50))
+x[y==0,2] <- x[y==0,2] + 2.5
+dat <- data.frame(x=x, y=as.factor(y))
+
+ggplot(data = dat, aes(x = x.2, y = x.1, color = y, shape = y)) + 
+  geom_point(size = 2) +
+  scale_color_manual(values=c("#000000","#FF0000","#00BA00")) +
+  theme(legend.position = "none")
+```
+
+## Clasificación de múltiples clases
+```{r Clasificacion con multiples clases}
+svmfit <- svm(y~., data = dat, kernel = "radial", cost = 10, gamma = 1)
+
+plot(svmfit, dat)
+```
+
+## Prediccion con multiples clases
+```{r Prediccion con multiples clases}
+ypred <- predict(svmfit, dat)
+miclass <- table(predict = ypred, truth = dat$y)
+miclass
+```
+
+## Visualización de clasificación con múltiples clases
+
+```{r Visualizacion de clasificacion con multiples clases}
+# Entrenar
+kernfit <- ksvm(as.matrix(dat[,2:1]),dat$y, type = "C-svc", kernel = 'rbfdot', 
+                C = 100, scaled = c())
+
+# Crea una linea para la clasificacion
+x.1 <- seq(from = min(dat$x.1), to = max(dat$x.1), length = 100)
+x.2 <- seq(from = min(dat$x.2), to = max(dat$x.2), length = 100)
+x.grid <- expand.grid(x.2, x.1)
+
+# Prediccion
+pred <- predict(kernfit, newdata = x.grid)
+
+# Graficando resultados
+cols <- brewer.pal(3, "Set1")
+plot(x.grid, pch = 19, col = adjustcolor(cols[pred], alpha.f = 0.05))
+
+classes <- matrix(pred, nrow = 100, ncol = 100)
+contour(x = x.2, y = x.1, z = classes, levels = 1:3, labels = "", add = TRUE)
+
+points(dat[, 2:1], pch = 19, col = cols[predict(kernfit)])
+```
