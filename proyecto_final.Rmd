@@ -22,6 +22,46 @@ opts_chunk$set(echo=TRUE,
                message=FALSE,
                warning=FALSE)
 opts_knit$set(width=75)
+
+multiplot <- function(..., plotlist = NULL, cols = 1, layout = NULL, title = NULL, 
+                      fontsize = 14, fontfamily = "Helvetica", fontface = "bold") {
+  require(grid)
+  plots <- c(list(...), plotlist)
+  numPlots = length(plots)
+  if (is.null(layout)) {
+    layout <- matrix(seq(1, cols * ceiling(numPlots/cols)),
+                     ncol = cols, nrow = ceiling(numPlots/cols))
+  }
+   if (length(title)>0){
+    layout <- rbind(rep(0, ncol(layout)), layout)
+  }
+   if (numPlots==1) {
+    print(plots[[1]])
+   } else {
+    grid.newpage()
+    pushViewport(viewport(layout = grid.layout(nrow(layout), 
+                          ncol(layout), 
+                          heights = if (length(title)>0) {unit(c(0.5, rep(5,nrow(layout)-1)), "null")}
+                          else {unit(c(rep(5, nrow(layout))), "null")})))
+    if(length(title) > 1){
+    ncols <- 1:ncol(layout)
+    for(i in seq(ncols)){
+      grid.text(title[i], 
+                              vp = viewport(layout.pos.row = 1, layout.pos.col = i),
+                              gp = gpar(fontsize = fontsize, fontfamily = fontfamily, fontface = fontface))
+    }
+    } else {
+      grid.text(title, 
+                vp = viewport(layout.pos.row = 1, layout.pos.col = 1:ncol(layout)),
+                gp = gpar(fontsize = fontsize, fontfamily = fontfamily, fontface = fontface))
+    }
+    for (i in 1:numPlots) {
+      matchidx <- as.data.frame(which(layout == i, arr.ind = TRUE))
+       print(plots[[i]], vp = viewport(layout.pos.row = matchidx$row,
+                                      layout.pos.col = matchidx$col))
+    }
+  }
+}
 ```
 
 
@@ -88,6 +128,9 @@ Cargando las librerías necesarias para trabajar con el proyecto
 library(pastecs)
 library(ggplot2)
 library(dplyr)
+library(purrr)
+library(ggpubr)
+library(grid)
 library(DT)
 ```
 
@@ -107,4 +150,75 @@ glimpse(data)
 data_select <- data[,c(-21, -22, -24, -25)]
 ```
 
-## 
+## Datos nulos
+Verificamos la cantidad de datos nulos del conjunto de datos. OBservamos que solamente encontramos en la variable `children` que cuenta con 4 datos nulos que serán eliminados ya que de 119,390 registros, no vale la pena.
+```{r Datos nulos}
+map_dbl(data_select, .f = function(x){sum(is.na(x))})
+
+data_select <- na.omit(data_select)
+nrow(data_select)
+```
+
+## Distribución de variables
+En este apartado observamos la distribución de las variables y detectar valores atípicos principalmente con boxplots a partir de la variable principal dependiente que es `hotel`.
+
+```{r Distribucion de variables}
+plot1 <- ggplot(data = data_select, aes(x = hotel, y = is_canceled, color = hotel)) + geom_boxplot(outlier.color = "green") + geom_jitter() + theme_bw()
+
+plot2 <- ggplot(data = data_select, aes(x = hotel, y = lead_time, color = hotel)) + geom_boxplot(outlier.color = "green") + geom_jitter() + theme_bw()
+
+plot3 <- ggplot(data = data_select, aes(x = hotel, y = arrival_date_year, color = hotel)) + geom_boxplot(outlier.color = "green") + geom_jitter() + theme_bw()
+
+plot4 <- ggplot(data = data_select, aes(x = hotel, y = arrival_date_month, color = hotel)) + geom_boxplot(outlier.color = "green") + geom_jitter() + theme_bw()
+
+plot5 <- ggplot(data = data_select, aes(x = hotel, y = arrival_date_week_number, color = hotel)) + geom_boxplot(outlier.color = "green") + geom_jitter() + theme_bw()
+
+plot6 <- ggplot(data = data_select, aes(x = hotel, y = arrival_date_day_of_month, color = hotel)) + geom_boxplot(outlier.color = "green") + geom_jitter() + theme_bw()
+
+plot7 <- ggplot(data = data_select, aes(x = hotel, y = stays_in_weekend_nights, color = hotel)) + geom_boxplot(outlier.color = "green") + geom_jitter() + theme_bw()
+
+plot8 <- ggplot(data = data_select, aes(x = hotel, y = stays_in_week_nights, color = hotel)) + geom_boxplot(outlier.color = "green") + geom_jitter() + theme_bw()
+
+plot9 <- ggplot(data = data_select, aes(x = hotel, y = adults, color = hotel)) + geom_boxplot(outlier.color = "green") + geom_jitter() + theme_bw()
+
+plot10 <- ggplot(data = data_select, aes(x = hotel, y = children, color = hotel)) + geom_boxplot(outlier.color = "green") +  geom_jitter() + theme_bw()
+
+plot11 <- ggplot(data = data_select, aes(x = hotel, y = babies, color = hotel)) + geom_boxplot(outlier.color = "green") + geom_jitter() + theme_bw()
+
+plot12 <- ggplot(data = data_select, aes(x = hotel, y = meal, color = hotel)) + geom_boxplot(outlier.color = "green") + geom_jitter() + theme_bw()
+
+plot13 <- ggplot(data = data_select, aes(x = hotel, y = country, color = hotel)) + geom_boxplot(outlier.color = "green") + geom_jitter() + theme_bw()
+
+plot14 <- ggplot(data = data_select, aes(x = hotel, y = market_segment, color = hotel)) + geom_boxplot(outlier.color = "green") + geom_jitter() + theme_bw()
+
+plot15 <- ggplot(data = data_select, aes(x = hotel, y = distribution_channel, color = hotel)) + geom_boxplot(outlier.color = "green") + geom_jitter() + theme_bw()
+
+plot16 <- ggplot(data = data_select, aes(x = hotel, y = is_repeated_guest, color = hotel)) + geom_boxplot(outlier.color = "green") + geom_jitter() + theme_bw()
+
+plot17 <- ggplot(data = data_select, aes(x = hotel, y = previous_cancellations, color = hotel)) + geom_boxplot(outlier.color = "green") + geom_jitter() + theme_bw()
+
+plot18 <- ggplot(data = data_select, aes(x = hotel, y = previous_bookings_not_canceled, color = hotel)) + geom_boxplot(outlier.color = "green") + geom_jitter() + theme_bw()
+
+plot19 <- ggplot(data = data_select, aes(x = hotel, y = reserved_room_type, color = hotel)) + geom_boxplot(outlier.color = "green") + geom_jitter() + theme_bw()
+
+plot20 <- ggplot(data = data_select, aes(x = hotel, y = deposit_type, color = hotel)) + geom_boxplot(outlier.color = "green") + geom_jitter() + theme_bw()
+
+plot21 <- ggplot(data = data_select, aes(x = hotel, y = days_in_waiting_list, color = hotel)) + geom_boxplot(outlier.color = "green") + geom_jitter() + theme_bw()
+
+plot22 <- ggplot(data = data_select, aes(x = hotel, y = customer_type, color = hotel)) + geom_boxplot(outlier.color = "green") + geom_jitter() + theme_bw()
+
+plot23 <- ggplot(data = data_select, aes(x = hotel, y = adr, color = hotel)) + geom_boxplot(outlier.color = "green") + geom_jitter() + theme_bw()
+
+plot24 <- ggplot(data = data_select, aes(x = hotel, y = required_car_parking_spaces, color = hotel)) + geom_boxplot(outlier.color = "green") + geom_jitter() + theme_bw()
+
+plot25 <- ggplot(data = data_select, aes(x = hotel, y = total_of_special_requests, color = hotel)) + geom_boxplot(outlier.color = "green") + geom_jitter() + theme_bw()
+
+plot26 <- ggplot(data = data_select, aes(x = hotel, y = reservation_status, color = hotel)) + geom_boxplot(outlier.color = "green") + geom_jitter() + theme_bw()
+
+plot27 <- ggplot(data = data_select, aes(x = hotel, y = reservation_status_date, color = hotel)) + geom_boxplot(outlier.color = "green") + geom_jitter() + theme_bw()
+
+final.boxplot <- ggarrange(plot1, plot2, plot3, plot4, plot5, plot6, plot7, plot8, plot9, plot10, plot11, plot12, plot13, plot14, plot15, plot16, plot17, plot18, plot19, plot20, plot21, plot22, plot23, plot24, plot25, plot26, plot27, legend = "right")
+final.boxplot <- annotate_figure(final.boxplot, top = text_grob("lead_time"))
+final.boxplot
+```
+
