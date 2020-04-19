@@ -1,0 +1,110 @@
+---
+title: "Proyecto final de Estadística Multivariada"
+author: "Jorge Zapata y Bernal Rojas"
+date: "`r Sys.Date()`"
+output:
+  rmdformats::readthedown:
+    highlight: kate
+---
+
+
+```{r setup, echo=FALSE, cache=FALSE}
+library(knitr)
+library(rmdformats)
+
+## Global options
+options(max.print="75")
+opts_chunk$set(echo=TRUE,
+	             cache=TRUE,
+               prompt=FALSE,
+               tidy=TRUE,
+               comment=NA,
+               message=FALSE,
+               warning=FALSE)
+opts_knit$set(width=75)
+```
+
+
+# Introducción
+A continuación evaluaremos un conjunto de datos sobre la demanda en la reserva de hoteles de dos tipos que se describirán a continuación. El conjunto de datos cuenta con 32 variables, entre ellas numéricas y categóricas, cada una a continuación con la descripción o diccionario documentado.
+
+# Contexto
+Alguna vez en nuestra vidas nos hemos preguntado: ¿Cuándo es la mejor época del año para reservar una habitación de hotel? ¿Cuál es la duración óptima de la estadía para obtener una mejor tarifa diaria?
+
+El siguiente conjunto de datos, describe a continuación las 32 variables que lo conforman, pero en general contiene información de reserva para un hotel urbano, turístico, cuando se realizó la reserva, duración de la estadía, cantidad de personas, espacios de estacionamiento, entre otros excepto información personal de clientes.
+
+## Variables
+
+- `hotel:` Variable dependiente, (H1 = Resort Hotel or H2 = City Hotel)
+- `is_canceled:` valor indicando si la reserva fue cancelada o no (1 si fué cancelada y 0 si no fué cancelada)
+- `lead_time:` número de días transcurridos entre la fecha de entrada en la reserva y la fecha de hospedaje
+- `arrival_date_year:` año de llegada al hotel
+- `arrival_date_month:` mes de llegada al hotel
+- `arrival_date_week_number:` número de la semana del año en la que llegó al hotel
+- `arrival_date_day_of_month:` día de llegada al hotel en un mes del año
+- `stays_in_weekend_nights:` cantidad de noches de fines de semana, es decir si se hospedó un sábado o domingo
+- `stays_in_week_nights:` número de noches semanales, es decir si se hospedó entre lunes a viernes
+- `adults:` número de adultos hospedados
+- `children:` número de niños hospedados
+- `babies:` número de niños recién nacidos hospedados
+- `meal:` Tipo de comida reservada, a continuación las categorías. Undefined/SC – sin paquete de comida; BB – alojamiento y desayuno; HB – desayuno y otra comida; FB – todos los tiempos de comida completos)
+- `country:` país de origen
+- `market_segment:` segmento del mercado en categorías, "TA" significa agentes de viaje y "TO" significa operadores turísticos
+- `distribution_channel:` canal por el cual se realizan las reservas, "TA" significa agentes de viaje y "TO" significa operadores turísticos
+- `is_repeated_guest:` valor de la reserva que indica si el huésped era repetido (1 significa repetido y 0 lo contrario)
+- `previous_cancelations:` número de reservas que el cliente ha cancelado antes de la reserva actual
+- `previous_bookings_not_canceled:` número de reservas anteriores no canceladas antes de la reserva actual
+- `reserved_room_type:` código de tipo de habitación reservada
+- `assigned_room_type:` código de la habitación reservada en caso de un cambio a la reservada anteriormente, estos valores fueron alterados para evitar inferencias en las bases de datos de ellos y mantener la privacidad del cliente.
+- `booking_changes:` modificaciones realizadas en la reserva desde el momento que la reserva se insertó en el sistema
+- `deposit_type:` indica si el cliente realizó un deposito para garantizar la reserva
+- `agent:` ID de la agencia de viajes
+- `company:` ID de la compañía, aplicación o agencia de viajes que realizó la transacción del cliente
+- `days_in_waiting_list:` número de días que la reserva estuvo en la lista de espera
+- `customer_type:` tipo de cliente
+- `adr:` tarifa diaria promedio
+- `required_car_parking_spaces:` número de parqueos que necesitó en el hospedaje al hotel
+- `total_of_special_requests:` número de solicitudes especiales realizadas por el cliente
+- `reservation_status:` el último estado de la reserva en tres categorías si fué cancelada, si el cliente ya se fue o si el cliente no se registró cuando ingresó al hotel
+- `reservation_status_date:` fecha en la que se estableció el último estado
+
+**nuestras preguntas de investigación son las siguientes:**
+
+- ¿Cuál es la mejor época para reservar una habitación de hotel? tomando en cuenta variables como las fechas, semanas o precio óptimo
+- ¿Como entendemos la segmentación del mercado y prepararnos para diferentes temporadas?
+
+# Objetivos
+
+- Determinar la mejor época de reservación de una habitación de hotel tomando en cuenta el precio.
+- Entender los grupos de clientes para preparar los hoteles para diferentes temporadas.
+
+# Metodologías
+
+A continuación esteremos abordando todo el procedimiento necesario para obtener las respuestas a las preguntas y objetivos planteados incluyendo la metodología utilizada, procedimiento y análisis inicial de los datos.
+
+## Librerías
+Cargando las librerías necesarias para trabajar con el proyecto
+```{r Librerias}
+library(pastecs)
+library(ggplot2)
+library(dplyr)
+library(DT)
+```
+
+## Cargando datos
+Cargamos los datos completos desde nuestra carpeta del proyecto.
+```{r Cargando datos}
+setwd("/mnt/napster_disk/LEAD University/IQ - 2020/Estadística Multivariada/proyecto_final/")
+data <- read.csv("hotel_bookings.csv", sep = ",", header = TRUE)
+data
+#datatable(data)
+```
+
+## Tipos de variables
+Observamos la tipología de los datos, observamos que su mayoría son numéricos y 9 variables de tipo categóricas y algunas representadas en letras, tenemos que hacer la selección de los datos ya que tenemos variables que sin identificadores.
+```{r Tipos de variables}
+glimpse(data)
+data_select <- data[,c(-21, -22, -24, -25)]
+```
+
+## 
