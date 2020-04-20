@@ -131,7 +131,14 @@ library(dplyr)
 library(purrr)
 library(ggpubr)
 library(grid)
+library(cowplot)
+library(gridExtra)
 library(DT)
+library(caret)
+library(recipes)
+library(corrplot)
+library(doParallel)
+library(MASS)
 ```
 
 ## Cargando datos
@@ -147,78 +154,178 @@ data
 Observamos la tipología de los datos, observamos que su mayoría son numéricos y 9 variables de tipo categóricas y algunas representadas en letras, tenemos que hacer la selección de los datos ya que tenemos variables que sin identificadores.
 ```{r Tipos de variables}
 glimpse(data)
-data_select <- data[,c(-21, -22, -24, -25)]
+data.select <- data[,c(-21, -22, -24, -25)]
 ```
 
 ## Datos nulos
 Verificamos la cantidad de datos nulos del conjunto de datos. OBservamos que solamente encontramos en la variable `children` que cuenta con 4 datos nulos que serán eliminados ya que de 119,390 registros, no vale la pena.
 ```{r Datos nulos}
-map_dbl(data_select, .f = function(x){sum(is.na(x))})
+map_dbl(data.select, .f = function(x){sum(is.na(x))})
 
-data_select <- na.omit(data_select)
-nrow(data_select)
+data.select <- na.omit(data.select)
+nrow(data.select)
 ```
 
 ## Distribución de variables
 En este apartado observamos la distribución de las variables y detectar valores atípicos principalmente con boxplots a partir de la variable principal dependiente que es `hotel`.
 
+Observamos algunos valores atípicos en variables como `babies`, `adults`, `previous_bookings_not_canceled`, etc... en los cuales trataremos de eliminarlos, suavizarlos o normalizarlos.
 ```{r Distribucion de variables}
-plot1 <- ggplot(data = data_select, aes(x = hotel, y = is_canceled, color = hotel)) + geom_boxplot(outlier.color = "green") + geom_jitter() + theme_bw()
+plot1 <- ggplot(data = data.select, aes(x = hotel, y = is_canceled, color = hotel)) + geom_boxplot(outlier.color = "green") + geom_jitter() + theme_bw()
 
-plot2 <- ggplot(data = data_select, aes(x = hotel, y = lead_time, color = hotel)) + geom_boxplot(outlier.color = "green") + geom_jitter() + theme_bw()
+plot2 <- ggplot(data = data.select, aes(x = hotel, y = lead_time, color = hotel)) + geom_boxplot(outlier.color = "green") + geom_jitter() + theme_bw()
 
-plot3 <- ggplot(data = data_select, aes(x = hotel, y = arrival_date_year, color = hotel)) + geom_boxplot(outlier.color = "green") + geom_jitter() + theme_bw()
+plot3 <- ggplot(data = data.select, aes(x = hotel, y = arrival_date_year, color = hotel)) + geom_boxplot(outlier.color = "green") + geom_jitter() + theme_bw()
 
-plot4 <- ggplot(data = data_select, aes(x = hotel, y = arrival_date_month, color = hotel)) + geom_boxplot(outlier.color = "green") + geom_jitter() + theme_bw()
+plot4 <- ggplot(data = data.select, aes(x = hotel, y = arrival_date_month, color = hotel)) + geom_boxplot(outlier.color = "green") + geom_jitter() + theme_bw()
 
-plot5 <- ggplot(data = data_select, aes(x = hotel, y = arrival_date_week_number, color = hotel)) + geom_boxplot(outlier.color = "green") + geom_jitter() + theme_bw()
+plot5 <- ggplot(data = data.select, aes(x = hotel, y = arrival_date_week_number, color = hotel)) + geom_boxplot(outlier.color = "green") + geom_jitter() + theme_bw()
 
-plot6 <- ggplot(data = data_select, aes(x = hotel, y = arrival_date_day_of_month, color = hotel)) + geom_boxplot(outlier.color = "green") + geom_jitter() + theme_bw()
+plot6 <- ggplot(data = data.select, aes(x = hotel, y = arrival_date_day_of_month, color = hotel)) + geom_boxplot(outlier.color = "green") + geom_jitter() + theme_bw()
 
-plot7 <- ggplot(data = data_select, aes(x = hotel, y = stays_in_weekend_nights, color = hotel)) + geom_boxplot(outlier.color = "green") + geom_jitter() + theme_bw()
+plot7 <- ggplot(data = data.select, aes(x = hotel, y = stays_in_weekend_nights, color = hotel)) + geom_boxplot(outlier.color = "green") + geom_jitter() + theme_bw()
 
-plot8 <- ggplot(data = data_select, aes(x = hotel, y = stays_in_week_nights, color = hotel)) + geom_boxplot(outlier.color = "green") + geom_jitter() + theme_bw()
+plot8 <- ggplot(data = data.select, aes(x = hotel, y = stays_in_week_nights, color = hotel)) + geom_boxplot(outlier.color = "green") + geom_jitter() + theme_bw()
 
-plot9 <- ggplot(data = data_select, aes(x = hotel, y = adults, color = hotel)) + geom_boxplot(outlier.color = "green") + geom_jitter() + theme_bw()
+plot9 <- ggplot(data = data.select, aes(x = hotel, y = adults, color = hotel)) + geom_boxplot(outlier.color = "green") + geom_jitter() + theme_bw()
 
-plot10 <- ggplot(data = data_select, aes(x = hotel, y = children, color = hotel)) + geom_boxplot(outlier.color = "green") +  geom_jitter() + theme_bw()
+plot10 <- ggplot(data = data.select, aes(x = hotel, y = children, color = hotel)) + geom_boxplot(outlier.color = "green") +  geom_jitter() + theme_bw()
 
-plot11 <- ggplot(data = data_select, aes(x = hotel, y = babies, color = hotel)) + geom_boxplot(outlier.color = "green") + geom_jitter() + theme_bw()
+plot11 <- ggplot(data = data.select, aes(x = hotel, y = babies, color = hotel)) + geom_boxplot(outlier.color = "green") + geom_jitter() + theme_bw()
 
-plot12 <- ggplot(data = data_select, aes(x = hotel, y = meal, color = hotel)) + geom_boxplot(outlier.color = "green") + geom_jitter() + theme_bw()
+plot12 <- ggplot(data = data.select, aes(x = hotel, y = meal, color = hotel)) + geom_boxplot(outlier.color = "green") + geom_jitter() + theme_bw()
 
-plot13 <- ggplot(data = data_select, aes(x = hotel, y = country, color = hotel)) + geom_boxplot(outlier.color = "green") + geom_jitter() + theme_bw()
+plot13 <- ggplot(data = data.select, aes(x = hotel, y = country, color = hotel)) + geom_boxplot(outlier.color = "green") + geom_jitter() + theme_bw()
 
-plot14 <- ggplot(data = data_select, aes(x = hotel, y = market_segment, color = hotel)) + geom_boxplot(outlier.color = "green") + geom_jitter() + theme_bw()
+plot14 <- ggplot(data = data.select, aes(x = hotel, y = market_segment, color = hotel)) + geom_boxplot(outlier.color = "green") + geom_jitter() + theme_bw()
 
-plot15 <- ggplot(data = data_select, aes(x = hotel, y = distribution_channel, color = hotel)) + geom_boxplot(outlier.color = "green") + geom_jitter() + theme_bw()
+plot15 <- ggplot(data = data.select, aes(x = hotel, y = distribution_channel, color = hotel)) + geom_boxplot(outlier.color = "green") + geom_jitter() + theme_bw()
 
-plot16 <- ggplot(data = data_select, aes(x = hotel, y = is_repeated_guest, color = hotel)) + geom_boxplot(outlier.color = "green") + geom_jitter() + theme_bw()
+plot16 <- ggplot(data = data.select, aes(x = hotel, y = is_repeated_guest, color = hotel)) + geom_boxplot(outlier.color = "green") + geom_jitter() + theme_bw()
 
-plot17 <- ggplot(data = data_select, aes(x = hotel, y = previous_cancellations, color = hotel)) + geom_boxplot(outlier.color = "green") + geom_jitter() + theme_bw()
+plot17 <- ggplot(data = data.select, aes(x = hotel, y = previous_cancellations, color = hotel)) + geom_boxplot(outlier.color = "green") + geom_jitter() + theme_bw()
 
-plot18 <- ggplot(data = data_select, aes(x = hotel, y = previous_bookings_not_canceled, color = hotel)) + geom_boxplot(outlier.color = "green") + geom_jitter() + theme_bw()
+plot18 <- ggplot(data = data.select, aes(x = hotel, y = previous_bookings_not_canceled, color = hotel)) + geom_boxplot(outlier.color = "green") + geom_jitter() + theme_bw()
 
-plot19 <- ggplot(data = data_select, aes(x = hotel, y = reserved_room_type, color = hotel)) + geom_boxplot(outlier.color = "green") + geom_jitter() + theme_bw()
+plot19 <- ggplot(data = data.select, aes(x = hotel, y = reserved_room_type, color = hotel)) + geom_boxplot(outlier.color = "green") + geom_jitter() + theme_bw()
 
-plot20 <- ggplot(data = data_select, aes(x = hotel, y = deposit_type, color = hotel)) + geom_boxplot(outlier.color = "green") + geom_jitter() + theme_bw()
+plot20 <- ggplot(data = data.select, aes(x = hotel, y = deposit_type, color = hotel)) + geom_boxplot(outlier.color = "green") + geom_jitter() + theme_bw()
 
-plot21 <- ggplot(data = data_select, aes(x = hotel, y = days_in_waiting_list, color = hotel)) + geom_boxplot(outlier.color = "green") + geom_jitter() + theme_bw()
+plot21 <- ggplot(data = data.select, aes(x = hotel, y = days_in_waiting_list, color = hotel)) + geom_boxplot(outlier.color = "green") + geom_jitter() + theme_bw()
 
-plot22 <- ggplot(data = data_select, aes(x = hotel, y = customer_type, color = hotel)) + geom_boxplot(outlier.color = "green") + geom_jitter() + theme_bw()
+plot22 <- ggplot(data = data.select, aes(x = hotel, y = customer_type, color = hotel)) + geom_boxplot(outlier.color = "green") + geom_jitter() + theme_bw()
 
-plot23 <- ggplot(data = data_select, aes(x = hotel, y = adr, color = hotel)) + geom_boxplot(outlier.color = "green") + geom_jitter() + theme_bw()
+plot23 <- ggplot(data = data.select, aes(x = hotel, y = adr, color = hotel)) + geom_boxplot(outlier.color = "green") + geom_jitter() + theme_bw()
 
-plot24 <- ggplot(data = data_select, aes(x = hotel, y = required_car_parking_spaces, color = hotel)) + geom_boxplot(outlier.color = "green") + geom_jitter() + theme_bw()
+plot24 <- ggplot(data = data.select, aes(x = hotel, y = required_car_parking_spaces, color = hotel)) + geom_boxplot(outlier.color = "green") + geom_jitter() + theme_bw()
 
-plot25 <- ggplot(data = data_select, aes(x = hotel, y = total_of_special_requests, color = hotel)) + geom_boxplot(outlier.color = "green") + geom_jitter() + theme_bw()
+plot25 <- ggplot(data = data.select, aes(x = hotel, y = total_of_special_requests, color = hotel)) + geom_boxplot(outlier.color = "green") + geom_jitter() + theme_bw()
 
-plot26 <- ggplot(data = data_select, aes(x = hotel, y = reservation_status, color = hotel)) + geom_boxplot(outlier.color = "green") + geom_jitter() + theme_bw()
+plot26 <- ggplot(data = data.select, aes(x = hotel, y = reservation_status, color = hotel)) + geom_boxplot(outlier.color = "green") + geom_jitter() + theme_bw()
 
-plot27 <- ggplot(data = data_select, aes(x = hotel, y = reservation_status_date, color = hotel)) + geom_boxplot(outlier.color = "green") + geom_jitter() + theme_bw()
+plot27 <- ggplot(data = data.select, aes(x = hotel, y = reservation_status_date, color = hotel)) + geom_boxplot(outlier.color = "green") + geom_jitter() + theme_bw()
 
-final.boxplot <- ggarrange(plot1, plot2, plot3, plot4, plot5, plot6, plot7, plot8, plot9, plot10, plot11, plot12, plot13, plot14, plot15, plot16, plot17, plot18, plot19, plot20, plot21, plot22, plot23, plot24, plot25, plot26, plot27, legend = "right")
-final.boxplot <- annotate_figure(final.boxplot, top = text_grob("lead_time"))
-final.boxplot
+final.boxplot1 <- plot_grid(plot1, plot2, plot3, plot4, nrow = 2)
+
+final.boxplot2 <- plot_grid(plot5, plot6, plot7, plot8, nrow = 2)
+
+final.boxplot3 <- plot_grid(plot9, plot10, plot11, plot12, nrow = 2)
+
+final.boxplot4 <- plot_grid(plot13, plot14, plot15, plot16, nrow = 2)
+
+final.boxplot5 <- plot_grid(plot17, plot18, plot19, plot20, nrow = 2)
+
+final.boxplot6 <- plot_grid(plot21, plot22, plot23, plot24, nrow = 2)
+
+final.boxplot7 <- plot_grid(plot25, plot26, plot27, nrow = 2)
+
+final.boxplot1
+final.boxplot2
+final.boxplot3
+final.boxplot4
+final.boxplot5
+final.boxplot6
+final.boxplot7
 ```
 
+## Correlaciones
+Analizamos cuales son las variables con mayor ganancia de información y correlación para seleccionar las variables que valen la pena en el modelo predictivo.
+Encontramos muy poca correlación entre ellas.
+
+```{r Correlaciones}
+correlations <- cor(select_if(data.select, is.numeric), method = "pearson")
+as.data.frame(correlations)
+datatable(correlations)
+```
+
+
+## Estandarización y binarización
+Escalamos las variables numéricas y las variables categóricas se le aplica binarización en un `recipe()`, funcion que nos permite guardar la información de la transformación, para cuando se agreguen nuevas variables haga la misma transformación.
+
+```{r Estandarizacion y binarizacion}
+# headers <- names(data.select)
+# headers <- as.vector(headers)
+# headers
+# 
+# data.select.recipe <- recipe(formula = hotel ~ is_canceled + lead_time + arrival_date_year + arrival_date_month + arrival_date_week_number + arrival_date_day_of_month + stays_in_weekend_nights + stays_in_week_nights + adults + children + babies + meal + country + market_segment + distribution_channel + is_repeated_guest + previous_cancellations + previous_bookings_not_canceled + reserved_room_type + deposit_type + days_in_waiting_list + customer_type + adr + required_car_parking_spaces + total_of_special_requests + reservation_status + reservation_status_date, data = data.select)
+# 
+# #Variables numericas  
+# data.select.recipe <- data.select.recipe %>% step_center(all_numeric())
+# data.select.recipe <- data.select.recipe %>% step_scale(all_numeric())
+# 
+# #Seleccionamos las variables y las almacenamos en un objeto
+# data.select.trained <- prep(data.select.recipe, training = data.select)
+# data.select <- bake(data.select.trained, new_data = data.select)
+# 
+# ncol(data.select)
+```
+
+## Regresión logística
+Aplicamos una regresión logistica para visualizar las predicciones y conclusiones a partir de datos que son completamente numéricos
+
+```{r Regresion logistica}
+as.data.frame(data.select)
+data.numerical <- select_if(data.select, is.numeric)
+data.headers <- names(data.numerical)
+as.vector(data.headers)
+
+#Paralelizamos los procesos para que sea mas rapido, lo hacemos en funcion de nuestros cores virtuales del CPU
+workers <- makeCluster(4)
+registerDoParallel(workers)
+
+glm.fit <- glm(data.select$hotel ~ is_canceled + lead_time + arrival_date_year + arrival_date_week_number + arrival_date_day_of_month + stays_in_weekend_nights + stays_in_week_nights + adults + children + babies + is_repeated_guest + previous_cancellations + previous_bookings_not_canceled + days_in_waiting_list + adr + required_car_parking_spaces, data = data.select, family = binomial)
+
+summary(glm.fit)
+
+attach(data.select)
+glm.predict <- predict(glm.fit, type = "response")
+glm.predict <- ifelse(glm.predict > 0.3, "Resort Hotel", "City Hotel")
+
+cm <- table(hotel, glm.predict)
+precision <- (cm[1,1] + cm[2,2]) / (cm[1,1] + cm[2,2] +cm[1,2] + cm[2,1])
+precision
+```
+
+## Análisis de discriminante lineal
+Vamos a aplicar un análisis de discriminante lineal para comprender mejor las predicciones realizadas.
+
+```{r Analisis de discriminante lineal}  
+
+lda.fit <- lda(hotel ~ is_canceled + lead_time + arrival_date_year + arrival_date_week_number + arrival_date_day_of_month + stays_in_weekend_nights + stays_in_week_nights + adults + children + babies + is_repeated_guest + previous_cancellations + previous_bookings_not_canceled + days_in_waiting_list + adr + required_car_parking_spaces, data = data.select)
+
+summary(lda.fit)
+
+attach(data.select)
+lda.predict <- predict(lda.fit, type = "response")
+cm <- table(Predicted = lda.predict$class, Hotel=hotel)
+
+precision <- (cm[1,1] + cm[2,2]) / (cm[1,1] + cm[2,2] +cm[1,2] + cm[2,1])
+precision
+```
+
+# Análisis de conglomerados
+Vamos a entender la segmentacion de clientes para caracterizarlos y estar preparados para tener en los hoteles la preparación para cada segmento de clientes tomando en cuenta solamente las variables de tipo numéricas.
+```{r Analisis de conglomerados}
+data.cluster <- dist(data.select)
+
+```
