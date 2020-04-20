@@ -140,6 +140,7 @@ library(corrplot)
 library(doParallel)
 library(MASS)
 library(cluster)
+library(mvnTest)
 ```
 
 ## Cargando datos
@@ -258,6 +259,39 @@ correlations <- cor(select_if(data.select, is.numeric), method = "pearson")
 as.data.frame(correlations)
 datatable(correlations)
 ```
+
+## Test de normalidad
+Aplicaremos la prueba de anderson-darling, pero antes generaremos una muestra de ellos
+
+```{r Test de normalidad}
+ind <- sample(2, nrow(data.numerical), replace = TRUE, prob = c(0.9, 0.1))
+
+sample1 <- data.numerical[ind == 1, ]
+sample2 <- data.numerical[ind == 2, ]
+
+# Paralelizamos procesos
+workers <- makeCluster(4)
+registerDoParallel(workers)
+
+ad.test <- AD.test(sample2, qqplot = TRUE)
+ad.test
+
+nrow(sample2)
+```
+
+
+## MANOVA
+```{r MANOVA}
+data.select$hotel <- as.factor(data.select$hotel)
+
+dependent.vars <- cbind(data.numerical)
+
+comp.manova <- summary(manova(dependent.vars ~ data$Temperature))
+
+comp.manova
+
+```
+
 
 
 ## Estandarización y binarización
