@@ -139,6 +139,7 @@ library(recipes)
 library(corrplot)
 library(doParallel)
 library(MASS)
+library(cluster)
 ```
 
 ## Cargando datos
@@ -323,9 +324,56 @@ precision <- (cm[1,1] + cm[2,2]) / (cm[1,1] + cm[2,2] +cm[1,2] + cm[2,1])
 precision
 ```
 
-# Análisis de conglomerados
-Vamos a entender la segmentacion de clientes para caracterizarlos y estar preparados para tener en los hoteles la preparación para cada segmento de clientes tomando en cuenta solamente las variables de tipo numéricas.
-```{r Analisis de conglomerados}
-data.cluster <- dist(data.select)
+## Análisis de conglomerados
+Vamos a entender la segmentacion de clientes para caracterizarlos y estar preparados para tener en los hoteles la preparación para cada segmento de clientes tomando en cuenta solamente las variables de tipo numéricas y estimaremos la cantidad de clusters óptimos para analizar.
 
+### Selección de variables
+Seleccionamos según la cantidad de varianza, dos grupos como los óptimos para entender los clusters, lo cual tiene sentido ya que una de las variables `hotel`.
+```{r Seleccion de clusters}
+tot_withinss <- map_dbl(1:10, function(k){
+  model <- kmeans(data.numerical, centers = k)
+  model$tot.withinss
+})
+
+elbow_df <- data.frame(
+  k = 1:10 ,
+  tot_withinss = tot_withinss
+)
+
+ggplot(elbow_df, aes(x = k, y = tot_withinss)) +
+  geom_line() +
+  scale_x_continuous(breaks = 1:10)
 ```
+
+### Silhoutte
+Nos indica el siguiente error al aplicar Silueta para determinar el número óptimo de clusters: *Error in pam(x = data.numerical, k = k) : have 119386 observations, but not more than 65536 are allowed*.
+```{r Silhoutte}
+# sil_width <- map_dbl(2:10,  function(k){
+#   model <- pam(x = data.numerical, k = k)
+#   model$silinfo$avg.width
+# })
+# 
+# sil_df <- data.frame(
+#   k = 2:10,
+#   sil_width = sil_width
+# )
+# 
+# ggplot(sil_df, aes(x = k, y = sil_width)) +
+#   geom_line() +
+#   scale_x_continuous(breaks = 2:10)
+```
+
+## Aplicando clusters con kmeans
+Usamos el algoritmo kmeans porque la función `dist()` no deja para mas de 65536 registros.
+```{r Aplicando clusters con kmeans}
+data.kmeans <- kmeans(data.numerical, centers = 2)
+
+segment.cluster <- mutate(data.numerical, data.kmeans$cluster)
+
+segment.cluster %>% group_by(data.kmeans$cluster) %>% summarise_all(funs(mean(.)))
+```
+
+
+# Conclusiones
+
+# Recomendaciones
