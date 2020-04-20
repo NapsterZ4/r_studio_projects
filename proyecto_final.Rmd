@@ -122,8 +122,28 @@ El siguiente conjunto de datos, describe a continuación las 32 variables que lo
 
 A continuación esteremos abordando todo el procedimiento necesario para obtener las respuestas a las preguntas y objetivos planteados incluyendo la metodología utilizada, procedimiento y análisis inicial de los datos.
 
+Las metodologías que se usaron, son las siguientes en orden respectivo al HTML:
+
+- **Tipología de variables:** Es importante conocer con los tipos de datos que estamos trabajando, por esa razón realizamos un análisis inicial de la tipología para entender las variables numéricas y categóricas y con cuales trabajar.
+
+- **Datos nulos:** Conocer los datos nulos en el conjunto de datos es importante para enteder el comportamiento y distribución de los datos, sin embargo, en este conjunto de datos solamente se cuenta con 4 registros nulos que fueron eliminados.
+
+- **Distribución de variables:** Realizamos un análisis exploratorio de las distribuciones por medio de boxplots para visualizar los datos que se encontraban atípicos, fuera de una distribución normal, se encontraron algunos que se detallan en la sección, pero no fueron eliminados porque no afectaron el análisis posterior porque las variables que las contenían eran identificadores o no se necesitaban al ser categóricas, ya que nuestro análisis fue numérico.
+
+- **Correlaciones:** Nuestro objetivo con esta sección, fué comprender la colinealidad de las variables predictoras, sin embargo, la relación existente entre ellas no subió de un 0.2%.
+
+- **Test de normalidad:** Para visualizar nuestras posibles alteraciones en las predicciones normales, verificamos la distribución normal de nuestros datos y verificar si necesitan alguna transformación. En este caso, no se realizó.
+
+- **MANOVA:** Entender como afecta la variabilidad de todas las variables predictoras para nuestra variable independiente es importante para conocer el impacto de estas en el modelo, evidentemente ocupamos varianza para encontrar patrones.
+
+- **Regresión logística:** La regresión logística se realizó para responder la primera pregunta de investigación en la analítica predictiva pero no se obtuvieron resultados precisos y decidimos pasar al siguiente algoritmo.
+
+- **Análisis de discriminante lineal:** En vista a la respuesta de la regresión logística con bajas probabilidades y una precisión del 51%, aplicamos un análisis de discriminante lineal que nos arrogó mejores resultados en la predicción con un 71% de precisión, en el cual se tiene mas confianza para tomar decisiones.
+
+- **Análisis de conglomerados:** Se realiza en respuesta de la segunda pregunta de investigación y segundo objetivo, en la cual detallamos el proceso para entender el segmento de clientes que tenemos y como estar preparados para atender los clusters de clientes.
+
 ## Librerías
-Cargando las librerías necesarias para trabajar con el proyecto
+Cargando las librerías necesarias para trabajar con el proyecto en Rstudio.
 ```{r Librerias}
 library(pastecs)
 library(ggplot2)
@@ -153,14 +173,14 @@ data
 ```
 
 ## Tipos de variables
-Observamos la tipología de los datos, observamos que su mayoría son numéricos y 9 variables de tipo categóricas y algunas representadas en letras, tenemos que hacer la selección de los datos ya que tenemos variables que sin identificadores.
+Observamos la tipología de los datos, obtenemos que su mayoría son numéricos y 9 variables de tipo categóricas y algunas representadas en letras, tenemos que hacer la selección de los datos ya que tenemos variables que esten sin identificadores y eventualmente sin datos categóricos.
 ```{r Tipos de variables}
 glimpse(data)
 data.select <- data[,c(-21, -22, -24, -25)]
 ```
 
 ## Datos nulos
-Verificamos la cantidad de datos nulos del conjunto de datos. OBservamos que solamente encontramos en la variable `children` que cuenta con 4 datos nulos que serán eliminados ya que de 119,390 registros, no vale la pena.
+Verificamos la cantidad de datos nulos del conjunto de datos. Observamos que solamente encontramos en la variable `children` que cuenta con 4 datos nulos que serán eliminados ya que de 119,390 registros, no vale la pena realizar imputación basada en la media o en bootstrapping.
 ```{r Datos nulos}
 map_dbl(data.select, .f = function(x){sum(is.na(x))})
 
@@ -171,7 +191,7 @@ nrow(data.select)
 ## Distribución de variables
 En este apartado observamos la distribución de las variables y detectar valores atípicos principalmente con boxplots a partir de la variable principal dependiente que es `hotel`.
 
-Observamos algunos valores atípicos en variables como `babies`, `adults`, `previous_bookings_not_canceled`, etc... en los cuales trataremos de eliminarlos, suavizarlos o normalizarlos.
+Observamos algunos valores atípicos en variables como `babies`, `adults`, `previous_bookings_not_canceled`, pero se consideran importantes al momento del análisis porque mantienen una correlación estable y al momento de eliminarlos, ajustamos la predicción y la tendencia de tener mas adultos registrados en un tipo de hotel nos puede ayudar a identificar mejor las características de los clusters.
 ```{r Distribucion de variables}
 plot1 <- ggplot(data = data.select, aes(x = hotel, y = is_canceled, color = hotel)) + geom_boxplot(outlier.color = "green") + geom_jitter() + theme_bw()
 
@@ -251,8 +271,7 @@ final.boxplot7
 ```
 
 ## Correlaciones
-Analizamos cuales son las variables con mayor ganancia de información y correlación para seleccionar las variables que valen la pena en el modelo predictivo.
-Encontramos muy poca correlación entre ellas.
+Analizamos cuales son las variables con mayor correlación para seleccionar las variables que valen la pena en el modelo predictivo, en  las cuales encontramos muy poca correlación entre ellas, pero lo suficiente para evitar la colinealidad en la cual los algoritmos predictivos tienen a tener errores significativos.
 
 ```{r Correlaciones}
 correlations <- cor(select_if(data.select, is.numeric), method = "pearson")
@@ -261,9 +280,14 @@ datatable(correlations)
 ```
 
 ## Test de normalidad
-Aplicaremos la prueba de anderson-darling, pero antes generaremos una muestra de ellos
+Aplicaremos la prueba de anderson-darling, pero antes generaremos una muestra de ellos. Cuando aplicamos la muestra, observamos que los datos no se encuentran multivariadamente normales, por lo tanto se procede a normalizar los datos de tipo numéricos en la clusterización y análisis de conglomerados de los clientes.
 
 ```{r Test de normalidad}
+as.data.frame(data.select)
+data.numerical <- select_if(data.select, is.numeric)
+data.headers <- names(data.numerical)
+as.vector(data.headers)
+
 ind <- sample(2, nrow(data.numerical), replace = TRUE, prob = c(0.9, 0.1))
 
 sample1 <- data.numerical[ind == 1, ]
@@ -281,12 +305,14 @@ nrow(sample2)
 
 
 ## MANOVA
+Concluímos que el p-value observamos en el siguiente test, nos ayuda a rechazar la hipotesis nula, por lo tanto, todas las variables numéricas nos sirven para realizar una predicción y un aprendizaje no supervizado de entrenamiento.
+
 ```{r MANOVA}
 data.select$hotel <- as.factor(data.select$hotel)
 
-dependent.vars <- cbind(data.numerical)
+dependent.vars <- cbind(data.select$is_canceled, data.select$lead_time, data.select$arrival_date_year, data.select$arrival_date_week_number, data.select$arrival_date_day_of_month, data.select$stays_in_weekend_nights, data.select$stays_in_week_nights, data.select$adults, data.select$children, data.select$babies, data.select$is_repeated_guest, data.select$previous_cancellations, data.select$previous_bookings_not_canceled, data.select$days_in_waiting_list, data.select$adr, data.select$required_car_parking_spaces)
 
-comp.manova <- summary(manova(dependent.vars ~ data$Temperature))
+comp.manova <- summary(manova(dependent.vars ~ data.select$hotel))
 
 comp.manova
 
@@ -316,14 +342,9 @@ Escalamos las variables numéricas y las variables categóricas se le aplica bin
 ```
 
 ## Regresión logística
-Aplicamos una regresión logistica para visualizar las predicciones y conclusiones a partir de datos que son completamente numéricos
+Aplicamos una regresión logistica para visualizar las predicciones y conclusiones a partir de datos que son completamente numéricos. Observamos que la precisión en su predicción es demasiado baja, entre 30% a 50% en su ejecución, el modelo no nos indica confianza para tomar decisiones y esto representaría la mayor cantidad de predicciones realizadas para el *Hotel de tipo Resort*.
 
 ```{r Regresion logistica}
-as.data.frame(data.select)
-data.numerical <- select_if(data.select, is.numeric)
-data.headers <- names(data.numerical)
-as.vector(data.headers)
-
 #Paralelizamos los procesos para que sea mas rapido, lo hacemos en funcion de nuestros cores virtuales del CPU
 workers <- makeCluster(4)
 registerDoParallel(workers)
@@ -334,15 +355,18 @@ summary(glm.fit)
 
 attach(data.select)
 glm.predict <- predict(glm.fit, type = "response")
-glm.predict <- ifelse(glm.predict > 0.3, "Resort Hotel", "City Hotel")
+glm.predict <- ifelse(glm.predict > 0.1, "Resort Hotel", "City Hotel")
 
 cm <- table(hotel, glm.predict)
 precision <- (cm[1,1] + cm[2,2]) / (cm[1,1] + cm[2,2] +cm[1,2] + cm[2,1])
 precision
+
+cm
 ```
 
 ## Análisis de discriminante lineal
-Vamos a aplicar un análisis de discriminante lineal para comprender mejor las predicciones realizadas.
+Vamos a aplicar un análisis de discriminante lineal para comprender mejor las predicciones realizadas, ya que el modelo anterior no nos dió la suficiente confianza para una decisión, con este buscamos mejorar esa predicción, tomando en cuenta que el algoritmo tiene un mmejor comportamiento para predicciones de variables categóricas con dos o mas tipos.
+El resultado de precisión es de un 72% - 73%, esto nos indica que tendremos una demanda mayor de clientes en los hoteles de tipo *City Hotel*, pero también necesitamos conocer el perfil de los clientes para que los hoteles esten preparados.
 
 ```{r Analisis de discriminante lineal}  
 
@@ -353,19 +377,23 @@ summary(lda.fit)
 attach(data.select)
 lda.predict <- predict(lda.fit, type = "response")
 cm <- table(Predicted = lda.predict$class, Hotel=hotel)
+cm
 
-precision <- (cm[1,1] + cm[2,2]) / (cm[1,1] + cm[2,2] +cm[1,2] + cm[2,1])
+precision <- (cm[1,1] + cm[2,2]) / (cm[1,1] + cm[2,2] + cm[1,2] + cm[2,1])
 precision
+cm
 ```
 
 ## Análisis de conglomerados
 Vamos a entender la segmentacion de clientes para caracterizarlos y estar preparados para tener en los hoteles la preparación para cada segmento de clientes tomando en cuenta solamente las variables de tipo numéricas y estimaremos la cantidad de clusters óptimos para analizar.
 
-### Selección de variables
-Seleccionamos según la cantidad de varianza, dos grupos como los óptimos para entender los clusters, lo cual tiene sentido ya que una de las variables `hotel`.
+### Selección de clusters
+Seleccionamos según la cantidad de varianza, *dos* grupos como los óptimos para entender los clusters, lo cual tiene sentido ya que una de las variables `hotel` solamente cuenta con dos categorías.
 ```{r Seleccion de clusters}
+data.numerical.scaled <- scale(data.numerical)
+
 tot_withinss <- map_dbl(1:10, function(k){
-  model <- kmeans(data.numerical, centers = k)
+  model <- kmeans(data.numerical.scaled, centers = k)
   model$tot.withinss
 })
 
@@ -398,16 +426,40 @@ Nos indica el siguiente error al aplicar Silueta para determinar el número ópt
 ```
 
 ## Aplicando clusters con kmeans
-Usamos el algoritmo kmeans porque la función `dist()` no deja para mas de 65536 registros.
+Usamos el algoritmo kmeans porque la función `dist()` no aplica para mas de 65536 registros. Los resultados para los clusters son los siguientes:
+
+### **Cluster 1**
+En un 0.4% se ha cancelado la reserva, un tiempo mucho mayor que el grupo 2 correspondiente a un promedio de 122.78 días de reserva hasta la fecha de hospedaje, en su mayoría se encontró en el 2015, en promedio se encuentran en la semana 39 correpondiente entre la temporada de agosto hasta octubre. En promedio asisten 1 - 2 adultos con un promedio de 0.84 niños y probabilidades muy bajas de llevar niños pequeños de 0.007%, bajas probabilidades de cancelar las reservas, se encuentran en un 3% mas en la lista de espera que el grupo 2 y tienen una tarifa diaria menor con una diferencia de promedio de 17,3%.
+
+### **Cluster 2**
+En un 0.3% se ha cancelado completamente la reserva, transcurre menos tiempo entre la fecha de reserva y la de hospedaje correspondiente a 90.35% días, la mayoría llegó en promedio en 2016, llegaron en su mayoría en la semana 18, correspondiente a los meses entre abril y mayo, tiene la misma cantidad de adultos en promedio que el grupo anterior pero con mayor probabilidad de llevar niños al hotel, se encuentran en poco tiempo en la lista de espera de reservas y su tarifa diara promedio es de 109.04.
+
 ```{r Aplicando clusters con kmeans}
-data.kmeans <- kmeans(data.numerical, centers = 2)
+data.kmeans <- kmeans(data.numerical.scaled, centers = 2)
 
 segment.cluster <- mutate(data.numerical, data.kmeans$cluster)
 
-segment.cluster %>% group_by(data.kmeans$cluster) %>% summarise_all(funs(mean(.)))
+datatable(segment.cluster %>% group_by(data.kmeans$cluster) %>% summarise_all(funs(mean(.))))
 ```
-
 
 # Conclusiones
 
+Evaluando los clusters y predicciones anteriores, encontramos que:
+
+1. Transcurre menos tiempo entre la fecha de reserva y la fecha de hospedaje en diferentes grupos, por lo que se puede evaluar la posibilidad de una promoción durante este tiempo de espera.
+
+2. Las temporadas para los respectivos hoteles con mayor demanda de estos clusters se encuentra entre abril y mayo y la segunda temporada entre agosto y setiembre, por lo cual, deben estar preparados en la demanda de esas fechas.
+
+3. Para las fechas entre agosto y setiembre, se encuentran precios mas bajos según las estadísticas del primer cluster representando una tarifa de 17.3% menos que para fechas anteriores.
+
+4. Los hoteles mas demandados según las predicciones son los tipo de hotel *City Hotel*, por lo tanto estar preparado principalmente para las temporadas mencionadas en las conclusiones anteriores.
+
 # Recomendaciones
+
+Las recomendaciones son las siguientes:
+
+1. Presentar una promoción durante el tiempo de espera en la fecha de reserva, que incentive al cliente a no irse a buscar otro hotel por estar en la lista de espera.
+
+2. Estar preparado para los meses de abril, mayo, agosto y setiembre con mas demanda de los tipos de clientes descritos en los clusters, con todo el personal capacitado y activo para brindar un mejor servicio al cliente.
+
+3. Al tener las fechas entre agosto y setiembre precios mas bajos, tener promociones en las habitaciones para los clientes o paquetes especiales que incluyan implicitamente otros servicios bajo el mismo precio del cluster 1.
