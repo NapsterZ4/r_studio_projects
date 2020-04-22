@@ -337,7 +337,7 @@ model.nb
 ```{r Extrayendo predicciones del Naive Bayes}
 predictions.nb <- extractPrediction(
                   models = list(nb = model.nb),
-                  unkX = data.test.recipe[-114]
+                  unkX = data.test.recipe[-14]
                   )
 
 names(data.test.recipe)
@@ -423,6 +423,7 @@ model.lda <- train(target ~ ., data = data.train.recipe,
                     metric = "Accuracy",
                     trControl = control.train)
 
+model.lda
 ```
 
 ### Extraer predicciones del Análisis de discriminante lineal
@@ -433,5 +434,364 @@ predictions.lda <- extractPrediction(
                   testY = data.test.recipe$target
                   )
 
+```
+
+## Árbol de clasificación simple
+```{r Arbol de clasificacion simple}
+workers<-makeCluster(4)
+registerDoParallel(workers)
+
+# HIPERPARÁMETROS, NÚMERO DE REPETICIONES Y SEMILLAS PARA CADA REPETICIÓN
+partitions  <- 10
+repetitions <- 5
+
+# Hiperparámetros
+hyperparameters <- data.frame(parameter = "none")
+
+set.seed(123)
+seeds <- vector(mode = "list", length = (partitions * repetitions) + 1)
+for (i in 1:(partitions * repetitions)) {
+  seeds[[i]] <- sample.int(1000, nrow(hyperparameters))
+}
+seeds[[(partitions * repetitions) + 1]] <- sample.int(1000, 1)
+
+# DEFINICIÓN DEL ENTRENAMIENTO
+control.train <- trainControl(method = "repeatedcv", number = partitions,
+                              repeats = repetitions, seeds = seeds,
+                              returnResamp = "final", verboseIter = FALSE,
+                              allowParallel = TRUE)
+
+# AJUSTE DEL MODELO
+set.seed(342)
+model.C50Tree <- train(target ~ ., data = data.train.recipe,
+                    method = "C5.0Tree",
+                    tuneGrid = hyperparameters,
+                    metric = "Accuracy",
+                    trControl = control.train)
+model.C50Tree
+```
+
+### Extraer predicciones del Árbol de clasificación simple
+```{r Extraer predicciones del arbol de clasificacion simple}
+predictions.C50Tree <- extractPrediction(
+                  models = list(C50Tree = model.C50Tree),
+                  unkX = data.test.recipe[,-14]
+                  )
+```
+
+## Random Forest
+
+```{r Random Forest}
+workers<-makeCluster(4)
+registerDoParallel(workers)
+
+# HIPERPARÁMETROS, NÚMERO DE REPETICIONES Y SEMILLAS PARA CADA REPETICIÓN
+partitions  <- 10
+repetitions <- 5
+
+# Hiperparámetros
+hyperparameters <- expand.grid(mtry = c(3, 4, 5, 7),
+                               min.node.size = c(2, 3, 4, 5, 10, 15, 20, 30),
+                               splitrule = "gini")
+
+set.seed(123)
+seeds <- vector(mode = "list", length = (partitions * repetitions) + 1)
+for (i in 1:(partitions * repetitions)) {
+  seeds[[i]] <- sample.int(1000, nrow(hiperparametros))
+}
+seeds[[(partitions * repetitions) + 1]] <- sample.int(1000, 1)
+
+# DEFINICIÓN DEL ENTRENAMIENTO
+control.train <- trainControl(method = "repeatedcv", number = partitions,
+                              repeats = repetitions, seeds = seeds,
+                              returnResamp = "final", verboseIter = FALSE,
+                              allowParallel = TRUE)
+
+# AJUSTE DEL model
+set.seed(342)
+model.rf <- train(target ~ ., data = data.train.recipe,
+                   method = "ranger",
+                   tuneGrid = hyperparameters,
+                   metric = "Accuracy",
+                   trControl = control.train,
+                   # Número de árboles ajustados
+                   num.trees = 500)
+model.rf
+```
+
+### Representación gráfica del Random forest
+```{r Representacion grafica del Random Forest}
+ggplot(model.rf, highlight = TRUE) +
+  scale_x_continuous(breaks = 1:30) +
+  labs(title = "Evolución del accuracy del modelo Random Forest") +
+  guides(color = guide_legend(title = "mtry"),
+         shape = guide_legend(title = "mtry")) +
+  theme_bw()
+```
+
+
+
+### Extraer predicciones del Random forest
+```{r Extraer predicciones del Random Forest}
+predictions.rf <- extractPrediction(
+                  models = list(rf = modelo.rf),
+                  testX = data.test.recipe[,-14],
+                  testY = data.test.recipe$target
+                  )
+
+```
+
+## Gradient Boosting
+
+```{r Gradient Boosting}
+workers<-makeCluster(4)
+registerDoParallel(workers)
+
+# HIPERPARÁMETROS, NÚMERO DE REPETICIONES Y SEMILLAS PARA CADA REPETICIÓN
+partitions  <- 10
+repetitions <- 5
+
+# Hiperparámetros
+hyperparameters <- expand.grid(interaction.depth = c(1, 2),
+                               n.trees = c(500, 1000, 2000),
+                               shrinkage = c(0.001, 0.01, 0.1),
+                               n.minobsinnode = c(2, 5, 15))
+
+set.seed(123)
+seeds <- vector(mode = "list", length = (partitions * repetitions) + 1)
+for (i in 1:(partitions * repetitions)) {
+  seeds[[i]] <- sample.int(1000, nrow(hyperparameters))
+}
+seeds[[(partitions * repetitions) + 1]] <- sample.int(1000, 1)
+
+# DEFINICIÓN DEL ENTRENAMIENTO
+control.train <- trainControl(method = "repeatedcv", number = partitions,
+                              repeats = repetitions, seeds = seeds,
+                              returnResamp = "final", verboseIter = FALSE,
+                              allowParallel = TRUE)
+
+# AJUSTE DEL MODELO
+set.seed(342)
+model.boost <- train(target ~ ., data = data.train.recipe,
+                   method = "gbm",
+                   tuneGrid = hyperparameters,
+                   metric = "Accuracy",
+                   trControl = control.train,
+                   # Número de árboles ajustados
+                   distribution = "adaboost",
+                   verbose = FALSE)
+model.boost
+```
+
+### Representación gráfica del Gradient boosting
+```{r Representacion grafica del gradient boosting}
+ggplot(model.boost, highlight = TRUE) +
+  labs(title = "Evolución del accuracy del modelo Gradient Boosting") +
+    guides(color = guide_legend(title = "shrinkage"),
+           shape = guide_legend(title = "shrinkage")) +
+  theme_bw() +
+  theme(legend.position = "bottom")
+```
+
+### Extraer predicciones del Gradient boosting
+```{r Extraer predicciones del gradient boosting}
+predictions.boost <- extractPrediction(
+                  models = list(boost = model.boost),
+                  testX = data.test.recipe[,-14],
+                  testY = data.test.recipe
+                  )
+predictions.boost
+```
+
+## Máquinas de soporte vectorial SVM
+```{r Maquinas de soporte vectorial SVM}
+workers<-makeCluster(4)
+registerDoParallel(workers)
+
+# HIPERPARÁMETROS, NÚMERO DE REPETICIONES Y SEMILLAS PARA CADA REPETICIÓN
+partitions  <- 10
+repetitions <- 5
+
+# Hiperparámetros
+hyperparameters <- expand.grid(sigma = c(0.001, 0.01, 0.1, 0.5, 1),
+                               C = c(1 , 20, 50, 100, 200, 500, 700))
+
+set.seed(123)
+seeds <- vector(mode = "list", length = (partitions * repetitions) + 1)
+for (i in 1:(partitions * repetitions)) {
+  seeds[[i]] <- sample.int(1000, nrow(hyperparameters))
+}
+seeds[[(partitions * repetitions) + 1]] <- sample.int(1000, 1)
+
+# DEFINICIÓN DEL ENTRENAMIENTO
+control.train <- trainControl(method = "repeatedcv", number = partitions,
+                              repeats = repetitions, seeds = seeds,
+                              returnResamp = "final", verboseIter = FALSE,
+                              allowParallel = TRUE)
+
+# AJUSTE DEL MODELO
+set.seed(342)
+model.svmrad <- train(target ~ ., data = data.train.recipe,
+                   method = "svmRadial",
+                   tuneGrid = hyperparameters,
+                   metric = "Accuracy",
+                   trControl = control.train)
+model.svmrad
+```
+
+### Representación gráfica del SVM
+```{r Representacion grafica del SVM}
+ggplot(model.svmrad, highlight = TRUE) +
+  labs(title = "Evolución del accuracy del modelo SVM Radial") +
+  theme_bw()
+```
+
+### Extraer predicciones del SVM
+```{r Extraer predicciones del SVM}
+predictions.svmrad <- extractPrediction(
+                  models = list(svmrad = model.svmrad),
+                  testX = data.test.recipe[,-14],
+                  testY = data.test.recipe$target
+                  )
+predictions.svmrad
+```
+
+##  Redes Neuronales
+```{r Redes neuronales}
+workers<-makeCluster(4)
+registerDoParallel(workers)
+
+# HIPERPARÁMETROS, NÚMERO DE REPETICIONES Y SEMILLAS PARA CADA REPETICIÓN
+partitions  <- 10
+repetitions <- 5
+
+# Hiperparámetros
+hyperparameters <- expand.grid(size = c(10, 20, 50, 80, 100, 120),
+                               decay = c(0.0001, 0.1, 0.5))
+
+set.seed(123)
+seeds <- vector(mode = "list", length = (partitions * repetitions) + 1)
+for (i in 1:(partitions * repetitions)) {
+  seeds[[i]] <- sample.int(1000, nrow(hyperparameters))
+}
+seeds[[(partitions * repetitions) + 1]] <- sample.int(1000, 1)
+
+# DEFINICIÓN DEL ENTRENAMIENTO
+control.train <- trainControl(method = "repeatedcv", number = partitions,
+                              repeats = repetitions, seeds = seeds,
+                              returnResamp = "final", verboseIter = FALSE,
+                              allowParallel = TRUE)
+
+# AJUSTE DEL MODELO
+set.seed(342)
+model.nnet <- train(target ~ ., data = data.train.recipe,
+                   method = "nnet",
+                   tuneGrid = hyperparameters,
+                   metric = "Accuracy",
+                   trControl = control.train,
+                   # Rango de inicialización de los pesos
+                   rang = c(-0.7, 0.7),
+                   # Número máximo de pesos
+                   # se aumenta para poder incluir más meuronas
+                   MaxNWts = 2000,
+                   # Para que no se muestre cada iteración por pantalla
+                   trace = FALSE)
+model.nnet
+```
+
+### Representación gráfica de las NNET
+```{r Representacion grafica de las NNET}
+ggplot(model.nnet, highlight = TRUE) +
+  labs(title = "Evolución del accuracy del modelo NNET") +
+  theme_bw()
+```
+
+### Extraer predicciones de las NNET
+```{r Extraer prediccionesde las NNET}
+predictions.nnet <- extractPrediction(
+                  models = list(svmrad = model.nnet),
+                  testX = data.test.recipe[,-14],
+                  testY = data.test.recipe$Survived
+                  )
+```
+
+# Comparar modelos
+```{r Comparar modelos}
+models <- list(KNN = model.knn, NB = model.nb, logistic = model.logistic,
+                LDA = model.lda, arbol = model.C50Tree, rf = model.rf,
+                boosting = model.boost, SVMradial = model.svmrad,
+                NNET = model.nnet)
+
+results.resamples <- resamples(modelss)
+DT::datatable(resuls.resamples$values)
+
+metrics.resamples <- results.resamples$values %>%
+                         gather(key = "modelo", value = "valor", -Resample) %>%
+                         separate(col = "modelo", into = c("modelo", "metrica"),
+                                  sep = "~", remove = TRUE)
+DT::datatable(metrics.resamples)
+
+```
+
+## Comparar el Accuracy con Kappa y promedio
+```{r Comparar el Accuracy y kappa promedio}
+metrics.resamples %>%
+  filter(metrica == "Accuracy") %>%
+  group_by(modelo) %>% 
+  summarise(media = mean(valor)) %>%
+  ggplot(aes(x = reorder(modelo, media), y = media, label = round(media, 2))) +
+    geom_segment(aes(x = reorder(modelo, media), y = 0,
+                     xend = modelo, yend = media),
+                     color = "grey50") +
+    geom_point(size = 7, color = "firebrick") +
+    geom_text(color = "white", size = 2.5) +
+    scale_y_continuous(limits = c(0, 1)) +
+    # Accuracy basal
+    geom_hline(yintercept = 0.62, linetype = "dashed") +
+    annotate(geom = "text", y = 0.72, x = 8.5, label = "Accuracy basal") +
+    labs(title = "Validación: Accuracy medio repeated-CV",
+         subtitle = "Modelos ordenados por media",
+         x = "modelo") +
+    coord_flip() +
+    theme_bw()
+```
+
+# Error de test
+```{r Error de test}
+predictions <- extractPrediction(
+                  models = models,
+                  testX = data.test.recipe[, -14],
+                  testY = data.test.recipe$target
+                  )
+
+datatable(predictions)
+
+metrics.predictions <- predictions %>%
+                         mutate(acierto = ifelse(obs == pred, TRUE, FALSE)) %>%
+                         group_by(object, dataType) %>%
+                         summarise(accuracy = mean(acierto))
+
+DT::datatable(metrics.predictions %>%
+  spread(key = dataType, value = accuracy) %>%
+  arrange(desc(Test)))
+```
+
+## Visualización del error de test
+```{r Visualizacion del error de test}
+ggplot(data = metrics.predictions,
+       aes(x = reorder(object, accuracy), y = accuracy,
+           color = dataType, label = round(accuracy, 2))) +
+  geom_point(size = 8) +
+  scale_color_manual(values = c("orangered2", "gray50")) +
+  geom_text(color = "white", size = 3) +
+  scale_y_continuous(limits = c(0, 1)) +
+  # Accuracy basal
+  geom_hline(yintercept = 0.62, linetype = "dashed") +
+  annotate(geom = "text", y = 0.66, x = 8.5, label = "Accuracy basal") +
+  coord_flip() +
+  labs(title = "Accuracy de entrenamiento y test", 
+       x = "modelo") +
+  theme_bw() + 
+  theme(legend.position = "bottom")
 ```
 
