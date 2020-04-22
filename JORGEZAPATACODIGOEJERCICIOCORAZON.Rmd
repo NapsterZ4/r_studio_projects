@@ -1,0 +1,437 @@
+---
+title: "Exámen final de predicción, ejercicio dificil"
+date: "`r Sys.Date()`"
+author: "Jorge Emilio Zapata Godoy"
+output:
+  rmdformats::readthedown:
+    highlight: kate
+---
+
+
+```{r setup, echo=FALSE, cache=FALSE}
+library(knitr)
+library(rmdformats)
+
+## Global options
+options(max.print="75")
+opts_chunk$set(echo=FALSE,
+	             cache=TRUE,
+               prompt=FALSE,
+               tidy=TRUE,
+               comment=NA,
+               message=FALSE,
+               warning=FALSE)
+opts_knit$set(width=75)
+```
+
+# Cargando librerías
+```{r Librerias}
+library(ggplot2)
+library(factoextra)
+library(dendextend)
+library(DT)
+library(d3heatmap)
+library(igraph)
+library(tidygraph)
+library(ggpubr)
+library(gridExtra)
+library(boot)
+library(caTools)
+library(ROCR)
+library(e1071)
+library(randomForest)
+library(rpart)
+library(caret)
+library(reshape)
+library(plotly)
+library(tidyverse)
+library(dplyr)
+library(tidyr)
+library(purrr)
+library(recipes)
+library(doParallel)
+library(klaR)
+library(C50)
+library(ranger)
+library(kernlab)
+library(modelgrid)
+library(corrplot)
+```
+
+
+# Inicializando datos
+```{r Inicializando datos}
+setwd("/mnt/napster_disk/LEAD University/IQ - 2020/Minería de Datos Avanzada/examen_predictivo/")
+data <- read.csv("datos.corazon.train.csv", sep = ",", header = TRUE)
+data
+```
+
+# Análisis exploratorio
+
+## Tipos de datos
+Cambiamos la tipología de los datos de todas las variables necesarias que son binarias o tienen entre 0 - 3 valores nulos tipo factor
+```{r Tipos de datos}
+glimpse(data)
+data <- data[,c(2,3,4,5,6,7,8,9,10,11,12,13,14,15)]
+
+data$sex <- if_else(data$sex == 1, "M", "F")
+data$target <- if_else(data$target == 1, "si", "no")
+
+data$sex <- as.factor(data$sex)
+data$target <- as.factor(data$target)
+data$cp <- as.factor(data$cp)
+data$fbs <- as.factor(data$fbs)
+data$restecg <- as.factor(data$fbs)
+data$exang <- as.factor(data$exang)
+data$slope <- as.factor(data$slope)
+data$ca <- as.factor(data$ca)
+data$thal <- as.factor(data$thal)
+
+datatable(data = data)
+```
+
+## Cantidad de nulos
+No cuenta con datos ausentes o datos nulos.
+```{r Cantidad de nulos}
+any(!complete.cases(data))
+map_dbl(data, .f = function(x){sum(is.na(x))})
+```
+
+## Distribución de variables
+La variable respuesta cuenta con 150 datos aproximadamente en punto 1. No logramos observar datos con mucha dispersión y outliers. La variable `talach` tiene valores que van entre 0 - 200 y la variable `chol` con valores entre 0 - 500, por lo tanto trataremos de normalizarlos junto con el resto (aplicar una transformación).
+```{r Distribución de variables}
+plot1 <- ggplot(data = data, aes(x = target, y = age, color = target)) + geom_boxplot(outlier.colour = "green") + geom_jitter() + theme_bw()
+plot2 <- ggplot(data = data, aes(x = target, y = sex, color = target)) + geom_boxplot(outlier.color = "green") + geom_jitter() + theme_bw()
+plot3 <- ggplot(data = data, aes(x = target, y = cp, color = target)) + geom_boxplot(outlier.color = "green") + geom_jitter() + theme_bw()
+plot4 <- ggplot(data = data, aes(x = target, y = trestbps, color = target)) + geom_boxplot(outlier.color = "green") + geom_jitter() + theme_bw()
+plot5 <- ggplot(data = data, aes(x = target, y = chol, color = target)) + geom_boxplot(outlier.color = "green") + geom_jitter() + theme_bw()
+plot6 <- ggplot(data = data, aes(x = target, y = fbs, color = target)) + geom_boxplot(outlier.color = "green") + geom_jitter() + theme_bw()
+plot7 <- ggplot(data = data, aes(x = target, y = restecg, color = target)) + geom_boxplot(outlier.color = "green") + geom_jitter() + theme_bw()
+plot8 <- ggplot(data = data, aes(x = target, y = thalach, color = target)) + geom_boxplot(outlier.color = "green") + geom_jitter() + theme_bw()
+plot9 <- ggplot(data = data, aes(x = target, y = exang, color = target)) + geom_boxplot(outlier.color = "green") + geom_jitter() + theme_bw()
+plot10 <- ggplot(data = data, aes(x = target, y = oldpeak, color = target)) + geom_boxplot(outlier.color = "green") + geom_jitter() + theme_bw()
+plot11 <- ggplot(data = data, aes(x = target, y = slope, color = target)) + geom_boxplot(outlier.color = "green") + geom_jitter() + theme_bw()
+plot12 <- ggplot(data = data, aes(x = target, y = ca, color = target)) + geom_boxplot(outlier.color = "green") + geom_jitter() + theme_bw()
+plot13 <- ggplot(data = data, aes(x = target, y = thal, color = target)) + geom_boxplot(outlier.color = "green") + geom_jitter() + theme_bw()
+
+final.plot1 <- ggarrange(plot1, plot2, plot3, plot4, plot5, plot6, plot7, plot8, plot9, ncol = 3, legend = "top")
+final.plot2 <- ggarrange(plot10, plot11, plot12, plot13, ncol = 2, legend = "top")
+
+final.plot1
+final.plot2
+```
+
+## Correlación de variables continuas
+Vemos la correlación existente entre variables continuas y variables numéricas discretas. Las variables `trestbps`, `chol` y `thalach` tienen una mayor correlación, esto nos indica cuales variables debemos tomar en cuenta para analizar.
+```{r Correlacion de variables continuas}
+correlations <- cor(select_if(data, is.numeric), method = "pearson")
+corrplot(correlations, method = "circle")
+```
+
+## Random forest para seleccionar variables
+Esta técnica funciona bien cuando no se tienen valores faltantes, por lo tanto se procede a utilizarla. Observamos que `ca`, `cp`, `thal` como se encuentran correlacionadas, también se muestran como mejores predictores.
+```{r Random Forest para seleccionar variables}
+data.rf <- data %>% dplyr::select(-age) %>% na.omit()
+data.rf <- map_if(.x = data, .p = is.character, .f = as.factor) %>% as.data.frame()
+
+model.rf <- randomForest(formula = target ~., data = na.omit(data.rf), mtry = 5, importante = TRUE, ntree = 1000)
+importance <- as.data.frame(model.rf$importance)
+importance <- rownames_to_column(importance, var = "variable")
+
+decrease.gini.plot <- ggplot(data = importance, aes(x = reorder(variable, MeanDecreaseGini), y = MeanDecreaseGini, fill = MeanDecreaseGini)) +
+  labs(x = "variable", title = "Reducción de pureza (Gini)") +
+  geom_col() +
+  coord_flip() +
+  theme_bw() +
+  theme(legend.position = "bottom")
+
+decrease.gini.plot
+```
+
+# Preprocesamiento
+
+## Particionado de datos
+Particionamos los datos en un 0.8 para entrenamiento y un 0.2 para pruebas.
+```{r Particionado de datos}
+train <- createDataPartition(y = data$target, p = 0.8, list = FALSE, times = 1)
+
+data.train <- data[train,]
+data.test <- data[-train,]
+```
+
+## Recipientes y cambio de valores
+Creamos un recipiente para cualquier transformación a nuevas variables agregadas y formatos, tambien se apliquen.
+```{r Recipientes y cambio de valores}
+data.recipe <- recipe(formula = target ~ age + sex + cp + trestbps + chol + fbs + restecg + thalach + exang + oldpeak + slope + ca + thal, data = data.train)
+```
+
+## Variables con varianzas cero
+Tenemos que evaluar la varianza, porque al tener datos con 0 varianza, no tenemos información. No se detecta ningún predictor con varianza cero, entonces se procede a los siguientes pasos.
+```{r Variables con varianzas cero}
+tmp <- data %>% dplyr::select(age, sex, cp, trestbps, chol, fbs, restecg, thalach, exang, oldpeak, slope, ca, thal) %>% nearZeroVar(saveMetrics = TRUE) 
+datatable(tmp) %>% formatPercentage("percentUnique", 2) %>% formatRound("freqRatio", 2)
+
+data.recipe <- data.recipe %>% step_nzv(all_predictors())
+```
+
+
+## Escalado de datos
+Escalamos o estandarizamos los datos (transformamos), tanto variables continuas, discretas y variables como factor.
+```{r Escalado de datos}
+data.recipe <- data.recipe %>% step_center(all_numeric())
+data.recipe <- data.recipe %>% step_scale(all_numeric())
+
+trained.recipe <- prep(data.recipe, training = data.train)
+trained.recipe
+
+# Aplicando las transformaciones a los dos conjuntos de datos
+
+data.train.recipe <- bake(trained.recipe, new_data = data.train)
+data.test.recipe <- bake(trained.recipe, new_data = data.test)
+
+glimpse(data.train.recipe)
+
+data.train.recipe
+data.test.recipe
+```
+
+## Seleccionar predictores
+Seleccionamos las variables predictoras utilizando algoritmos genéticos. Según el análisis seleccionamos las siguientes variables: `age`, `cp`, `chol`, `restecg`, `exang`, `ca`, `thal`.
+```{r Seleccionar predictores}
+workers<-makeCluster(4)
+registerDoParallel(workers)
+
+# Control de entrenamiento
+ga.ctrl <- gafsControl(functions = rfGA,
+                       method = "cv",
+                       number = 5,
+                       allowParallel = TRUE,
+                       genParallel = TRUE, 
+                       verbose = FALSE)
+
+# Selección de predictores
+set.seed(10)
+rf.ga <- gafs(x = data.train.recipe[, -14],
+              y = data.train.recipe$target,
+              iters = 10, 
+              popSize = 10,
+              gafsControl = ga.ctrl,
+              ntree = 100)
+rf.ga$optVariables
+
+data.variables.predict <- rf.ga$optVariables
+```
+
+# Aplicación de models
+Lo models que vamos a aplicar son los siguientes:
+
+- **KNN**
+- **Naive Bayes**
+- **Regresión logística**
+- **Análisis de discriminante lineal**
+- **Árbol de clasificación simple**
+- **RandomForest**
+- **Gradient Boosting**
+- **SVM**
+- **Redes neuronales**
+
+## K-Nearest Kneightbors KNN
+```{r Random forest}
+workers <- makeCluster(4)
+registerDoParallel(workers)
+
+# HIPERPARÁMETROS, NÚMERO DE REPETICIONES Y SEMILLAS PARA CADA REPETICIÓN
+partitions  <- 10
+repetitions <- 5
+
+# Hiperparámetros
+hyperparameters <- data.frame(k = c(1, 2, 5, 10, 15, 20, 30, 50))
+
+set.seed(123)
+seeds <- vector(mode = "list", length = (partitions * repetitions) + 1)
+for (i in 1:(partitions * repetitions)) {
+  seeds[[i]] <- sample.int(1000, nrow(hyperparameters)) 
+}
+seeds[[(partitions * repetitions) + 1]] <- sample.int(1000, 1)
+
+# DEFINICIÓN DEL ENTRENAMIENTO
+control.train <- trainControl(method = "repeatedcv", number = partitions,
+                              repeats = repetitions, seeds = seeds,
+                              returnResamp = "final", verboseIter = FALSE,
+                              allowParallel = TRUE)
+
+# AJUSTE DEL MODELO
+set.seed(342)
+model.knn <- train(target ~ ., data = data.train.recipe,
+                    method = "knn",
+                    tuneGrid = hyperparameters,
+                    metric = "Accuracy",
+                    trControl = control.train)
+
+model.knn
+```
+
+### Representación gráfica del KNN
+```{r Representación gráfica del KNN}
+ggplot(model.knn, highlight = TRUE) +
+  scale_x_continuous(breaks = hyperparameters$k) +
+  labs(title = "Evolución del accuracy del modelo KNN", x = "K") +
+  theme_bw()
+```
+
+### Extraer predicciones de KKN
+```{r Extraer predicciones de KNN}
+setwd("/mnt/napster_disk/LEAD University/IQ - 2020/Minería de Datos Avanzada/examen_predictivo/")
+data.train.unformated <- read.csv("datos.corazon.test.csv", sep = ",", header = TRUE)
+data.train.unformated$sex <- if_else(data.train.unformated$sex == 1, "masculino", "femenino")
+
+data.test.recipe.new <- bake(trained.recipe, new_data = data.train.unformated)
+
+predictions.knn <- extractPrediction(
+                  models = list(knn = model.knn),
+                  unkX = data.test.recipe[,-14]
+                  )
+```
+
+## Naive Bayes
+
+```{r Naive Bayes}
+workers<-makeCluster(4)
+registerDoParallel(workers)
+
+# HIPERPARÁMETROS, NÚMERO DE REPETICIONES Y SEMILLAS PARA CADA REPETICIÓN
+partitions  <- 10
+repetitions <- 5
+
+# Hiperparámetros
+hyperparameters <- data.frame(usekernel = FALSE, fL = 0 , adjust = 0)
+
+set.seed(123)
+seeds <- vector(mode = "list", length = (partitions * repetitions) + 1)
+for (i in 1:(partitions * repetitions)) {
+  seeds[[i]] <- sample.int(1000, nrow(hyperparameters))
+}
+seeds[[(partitions * repetitions) + 1]] <- sample.int(1000, 1)
+
+# DEFINICIÓN DEL ENTRENAMIENTO
+#===============================================================================
+control.train <- trainControl(method = "repeatedcv", number = partitions,
+                              repeats = repetitions, seeds = seeds,
+                              returnResamp = "final", verboseIter = FALSE,
+                              allowParallel = TRUE)
+
+# AJUSTE DEL MODELO
+# ==============================================================================
+set.seed(342)
+model.nb <- train(target ~ ., data = data.train.recipe,
+                   method = "nb",
+                   tuneGrid = hyperparameters,
+                   metric = "Accuracy",
+                   trControl = control.train)
+
+model.nb
+```
+
+### Extrayendo predicciones del Naive Bayes
+
+```{r Extrayendo predicciones del Naive Bayes}
+predictions.nb <- extractPrediction(
+                  models = list(nb = model.nb),
+                  unkX = data.test.recipe[-114]
+                  )
+
+names(data.test.recipe)
+```
+
+## Regresión logística
+
+```{r Regresion logistica}
+workers<-makeCluster(4)
+registerDoParallel(workers)
+
+# HIPERPARÁMETROS, NÚMERO DE REPETICIONES Y SEMILLAS PARA CADA REPETICIÓN
+partitions  <- 10
+repetitions <- 5
+
+# Hiperparámetros
+hyperparameters <- data.frame(parameter = "none")
+
+set.seed(123)
+seeds <- vector(mode = "list", length = (partitions * repetitions) + 1)
+for (i in 1:(partitions * repetitions)) {
+  seeds[[i]] <- sample.int(1000, nrow(hyperparameters))
+}
+seeds[[(partitions * repetitions) + 1]] <- sample.int(1000, 1)
+
+# DEFINICIÓN DEL ENTRENAMIENTO
+control.train <- trainControl(method = "repeatedcv", number = partitions,
+                              repeats = repetitions, seeds = seeds,
+                              returnResamp = "final", verboseIter = FALSE,
+                              allowParallel = TRUE)
+
+# AJUSTE DEL MODELO
+set.seed(342)
+model.logistic <- train(target ~ ., data = data.train.recipe,
+                         method = "glm",
+                         tuneGrid = hyperparameters,
+                         metric = "Accuracy",
+                         trControl = control.train,
+                         family = "binomial")
+
+model.logistic
+summary(model.logistic$finalModel)
+```
+
+### Extraer predicciones de Regresión logística
+```{r Extraer predicciones de Regresion Logistica}
+predictions.logistic <- extractPrediction(
+                  models = list(logistic = model.logistic),
+                  unkX = data.test.recipe[,-14]
+                  )
+```
+
+## Análisis de discriminante lineal
+```{r Analisis de discriminante lineal}
+workers<-makeCluster(4)
+registerDoParallel(workers)
+
+# HIPERPARÁMETROS, NÚMERO DE REPETICIONES Y SEMILLAS PARA CADA REPETICIÓN
+partitions  <- 10
+repetitions <- 5
+
+# Hiperparámetros
+hyperparameters <- data.frame(parameter = "none")
+
+set.seed(123)
+seeds <- vector(mode = "list", length = (partitions * repetitions) + 1)
+for (i in 1:(partitions * repetitions)) {
+  seeds[[i]] <- sample.int(1000, nrow(hyperparameters))
+}
+seeds[[(partitions * repetitions) + 1]] <- sample.int(1000, 1)
+
+# DEFINICIÓN DEL ENTRENAMIENTO
+control.train <- trainControl(method = "repeatedcv", number = partitions,
+                              repeats = repetitions, seeds = seeds,
+                              returnResamp = "final", verboseIter = FALSE,
+                              allowParallel = TRUE)
+
+# AJUSTE DEL MODELO
+set.seed(342)
+model.lda <- train(target ~ ., data = data.train.recipe,
+                    method = "lda",
+                    tuneGrid = hyperparameters,
+                    metric = "Accuracy",
+                    trControl = control.train)
+
+```
+
+### Extraer predicciones del Análisis de discriminante lineal
+```{r Extraer predicciones del analisis de discriminante lineal}
+predictions.lda <- extractPrediction(
+                  models = list(lda = model.lda),
+                  testX = data.test.recipe[,-14],
+                  testY = data.test.recipe$target
+                  )
+
+```
+
